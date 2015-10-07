@@ -210,6 +210,28 @@ int main(int argc, char *argv[])
 				linSen_set_exposure(exp_val);
 			}
 		}
+		if (i2c && grab) {
+				int pixel_count, block_size, _result, i;
+				uint16_t* frame;
+
+				printf("try to grab a complete set of sensor values:\n");
+
+				linSen_get_dimensions(&pixel_count, &block_size);
+				printf("\tpixel count: %d\n", pixel_count);
+				printf("\tblock size: %d\n", block_size);
+
+				frame = malloc(pixel_count * sizeof(uint16_t));
+				_result = linSen_get_raw(frame, pixel_count);
+				printf("\tgot: %d bytes\n", _result);
+				
+				if (_result) {
+					for (i=0;i<pixel_count;i++) {
+						if (!(i%block_size)) printf("\n");
+						printf("\t%d", frame[i]);
+					}
+				}
+				printf("\n");
+			}
 	} else {
 		/* build header */
 		if (bright) fprintf(stdout, "brightness\t");
@@ -222,7 +244,7 @@ int main(int argc, char *argv[])
 	while (continuous) {
 		static int last_id = -1;
 		int _id = linSen_get_result_id();
-		if (last_id != _id) {
+//		if (last_id != _id) {
 			fprintf(stdout, "%d\t", _id);
 			if (bright) fprintf(stdout, "%d\t", linSen_get_brightness());
 			if (pxclk) fprintf(stdout, "%d\t", linSen_get_pxclk());
@@ -230,7 +252,7 @@ int main(int argc, char *argv[])
 			if (g_result) fprintf(stdout, "%d\t", linSen_get_global_result());
 			fprintf(stdout, "\n");
 			last_id = _id;
-		}
+//		}
 	}	
 	
 	if (i2c) linSen_i2c_de_init();

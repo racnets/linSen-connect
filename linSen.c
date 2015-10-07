@@ -95,6 +95,26 @@ int linSen_get_result_id(void) {
 	return (int)value;
 }
 
+int linSen_get_dimensions(int* pixel_count, int* block_size) {
+	uint8_t value;
+	int result;
+	
+	result = i2c_read_b(0x92, &value);
+	if (result) *pixel_count = value;
+	else return result;
+	result = i2c_read_b(0x93, &value);
+	if (result) *block_size = value;
+	else return result;
+	
+	return result;
+}
+
+int linSen_get_raw(uint16_t *frame, int size){
+	if (frame) 
+		return i2c_read_n_w(0xFF, frame, size);
+	else return -1;
+}
+
 int SPI_read_byte(int fd, uint8_t addr, uint8_t *value) {
 	int n = 1;
 	struct spi_ioc_transfer tr[2] = {{0},};

@@ -54,6 +54,8 @@ int linSen_get_brightness(void);
 
 int linSen_get_result_id(void);
 int linSen_get_global_result(void);
+int linSen_get_raw(uint16_t *frame, int size);
+int linSen_get_dimensions(int* pixel_count, int* block_size);
 
 int ADNS_read_motion_burst(int fd);
 int ADNS_read_frame_burst(int fd, uint8_t * frame);
