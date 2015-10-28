@@ -1,17 +1,18 @@
 /*
  * i2c.c
  *
- *  Created on: 03.01.2014
- *      Author: carsten
+ * Author: carsten
  */
 
 #include <unistd.h>			// read, write
 #include <linux/i2c-dev.h>	// I2C_SLAVE
 #include <fcntl.h>			// open
 #include <sys/ioctl.h>		// ioctl
-#include <stdint.h>
+#include <stdint.h>			// XintY_t-types
 #include <stdlib.h>			// malloc
 #include <string.h>			// memcpy
+
+#include "i2c.h"
 
 int i2c_fd = 0;
 uint8_t buf[4];
@@ -23,7 +24,7 @@ int i2c_init(const char *dev, int address) {
 	return ioctl(i2c_fd, I2C_SLAVE, address);
 }
 
-int i2c_de_init(void) {
+int i2c_close(void) {
 	return close(i2c_fd);
 }
 

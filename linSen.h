@@ -1,71 +1,67 @@
 /*
- * adns.h
+ * linSen.h
+ *
+ * Author: carsten
  */
 
-#ifndef ADNS_H_
-#define ADNS_H_
+#ifndef LINSEN_H_
+#define LINSEN_H_
+
+#define LINSEN_I2C_SLAVE_ADDRESS	0x18
+
+#define LINSEN_EXP_ADDR				0x80
+#define LINSEN_PIX_CLK_ADDR			0x84
+#define LINSEN_BRIGHT_ADDR			0x86
+#define LINSEN_PIX_NUMBER_X_ADDR	0x88
+#define LINSEN_PIX_NUMBER_Y_ADDR	0x8a
+#define LINSEN_SCALAR_NUMBER_ADDR	0x8c
+#define LINSEN_RES_ID_ADDR			0x8e
+#define LINSEN_GLOBAL_RES_ADDR		0x90
+#define LINSEN_RAW_ADDR				0xFF
+
+#define LINSEN_EXP_READ_STRING		"rE"
+#define LINSEN_PXI_CLK_READ_STRING	"rP"
+#define LINSEN_BRIGHT_READ_STRING	"rB"
+#define LINSEN_RESULT_READ_STRING	"rX"
+#define LINSEN_RES_ID_READ_STRING	"rXi"
+#define LINSEN_DATA_READ_STRING		"rD"
+#define LINSEN_RAW_READ_STRING		"rR"
 
 typedef struct {
-	uint8_t product_ID;
-	uint8_t inv_product_ID;
-	uint8_t revision;
-    union {
-		struct {
-			uint8_t RES:1;
-			uint8_t res3:3;
-			uint8_t OVF:1;
-			uint8_t res2:2;
-			uint8_t MOT:1;
-		} motion;
-		uint8_t motion_val;
-	};
-    union {
-		struct {
-			uint8_t Fixed_FR:1;
-			uint8_t NAGC:1;
-			uint8_t Serial_NPU:1;
-			uint8_t res:4;
-			uint8_t busy:1;
-		} ext_config;
-		uint8_t ext_config_val;
-	};
-	int8_t delta_X;
-	int8_t delta_Y;
-	uint16_t squal;	
-	uint8_t pixel_sum;
-	uint8_t maximum_pixel;
-	uint16_t shutter;
-	uint16_t frame_period;
-	uint16_t frame_period_max;
-	uint16_t frame_period_min;
-	uint16_t shutter_max;
-} adns3080_t;
-extern adns3080_t adns;
+	int exposure;
+	int pixel_clock;
+	int brightness;
+	int pixel_number_x;
+	int pixel_number_y;
+	int result_scalar_number;
+	int result_id;
+	int global_result;
+} linSen_data_t;
 
-int linSen_i2c_init(const char* dev, int address);
-int linSen_i2c_de_init(void);
+typedef enum {
+	interface_NONE,
+	interface_I2C,
+	interface_SOCKET
+} linSen_interface_t;
+
+int linSen_init(const char* dev, linSen_interface_t);
+int linSen_close(void);
 
 int linSen_set_exposure(int value);
 int linSen_get_exposure(void);
+
 int linSen_set_pxclk(int value);
 int linSen_get_pxclk(void);
+
 int linSen_set_brightness(int value);
 int linSen_get_brightness(void);
 
 int linSen_get_result_id(void);
 int linSen_get_global_result(void);
-int linSen_get_raw(uint16_t *frame, int size);
-int linSen_get_dimensions(int* pixel_count, int* block_size);
 
-int ADNS_read_motion_burst(int fd);
-int ADNS_read_frame_burst(int fd, uint8_t * frame);
-int ADNS_read_all(int fd);
-int ADNS_get_FPS_bounds(int fd);
-int ADNS_set_FPS_bounds(int fd, int shutter);
-int ADNS_get_ext_conf(int fd);
-int ADNS_set_ext_conf(int fd, uint8_t config);
-int ADNS_set_conf(int fd, uint8_t config);
+int linSen_get_raw(uint16_t* frame, int size);
 
-int init_SPI(int* file, int argc, char *argv[]);
+int linSen_get_data(linSen_data_t* data);
 
-#endif /* ADNS_H_ */
+int linSen_process();
+#endif /* LINSEN_H_ */

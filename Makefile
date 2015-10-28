@@ -1,6 +1,6 @@
 TARGET = linSen-connect
 
-C_SRCS = main.c i2c.c linSen.c socket-server.c
+C_SRCS = main.c i2c.c linSen.c linSen-socket.c
 
 INLCUDES = -I.
 
