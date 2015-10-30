@@ -4,23 +4,31 @@ C_SRCS = main.c i2c.c linSen.c linSen-socket.c
 
 INLCUDES = -I.
 
-#C_CFLAGS = -Wall -pedantic -O0 -std=c99
-C_CFLAGS = -Wall
-C_DFLAGS =
-C_LDFLAGS =
+CFLAGS = -Wall
+#CFLAGS += -pedantic -O0 -std=c99
+DFLAGS =
+LDFLAGS =
+LDLIBS = 
 
-C_EXT = c
-C_OBJS = $(patsubst %.$(C_EXT), %.o, $(C_SRCS))
+GUILIB = gtk+-2.0
+# add graphical output if supported by host system
+ifeq  ($(shell pkg-config --exists $(GUILIB) && echo 1), 1)
+	C_SRCS += gtk-viewer.c
+	CFLAGS += `pkg-config --cflags $(GUILIB)` -D GTK_GUI
+	LDLIBS += `pkg-config --libs $(GUILIB)`
+endif	
 
-C = gcc
+C_OBJS = $(patsubst %.c, %.o, $(C_SRCS))
+
+CC = gcc
 
 all: $(TARGET)
+	
+$(TARGET): $(C_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) -o $(TARGET) $(C_OBJS)
 
-$(TARGET): $(CPP_OBJS) $(C_OBJS)
-	$(C) $(C_CFLAGS) $(C_LDFLAGS) -o $(TARGET) $(C_OBJS)
-
-$(C_OBJS): %.o: %.$(C_EXT)
-	$(C) $(C_CFLAGS) $(C_DFLAGS) $(INCLUDES) -c $< -o $@ 
+$(C_OBJS): %.o: %.c
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDLIBS) $(INCLUDES) -c $< -o $@ 
 
 clean:
 	$(RM) $(TARGET) $(C_OBJS)

@@ -22,6 +22,7 @@ char* linSen_socket_get_client_address(void);
 int linSen_socket_server_process(void);
 
 int linSen_socket_client_init(const char *addr);
-int linSen_socket_client_process(void);
 int linSen_socket_client_read(char* str, int* val);
+int linSen_socket_client_write(const char* str, int val);
+
 #endif /* LINSEN_SOCKET_H_ */

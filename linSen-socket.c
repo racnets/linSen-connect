@@ -119,7 +119,8 @@ int linSen_socket_server_process(void) {
 	static enum {
 		STATE_UNKNOWN, 
 		STATE_WAIT, 
-		STATE_RX, 
+		STATE_RX,
+		STATE_PARSE,
 		STATE_TX_DATA,
 		STATE_TX_BRIGHTNESS,
 		STATE_TX_EXPOSURE, 
@@ -135,6 +136,8 @@ int linSen_socket_server_process(void) {
 	linSen_data_t linSen_data;
 	static char* _buffer;
 	static int _buffer_size = 0;
+	static int received = 0;
+	static int parsed = 0;
 
 	//~ printf("linSen_socket_server_process() called. State: %d\n", state);
 	switch (state) {
@@ -156,44 +159,80 @@ int linSen_socket_server_process(void) {
 			break;
 		}
 		case STATE_RX: {
-			int size;
 			
-			result = linSen_socket_receive(accepted_socket, &_buffer, &size);
-			if (result < 0) {
-				if (errno != EAGAIN) {
-					printf("\treceive failed with error %d: %s\n", errno, strerror(errno));
-					return result;
-				} else break;
-			} else if (result > 0) {
-				printf("\treceived %d bytes: \"%s\"!\n", size, _buffer);
-					// parse received command
-				if ((strcmp("grab", _buffer) == 0)
-					|| (strcmp("g", _buffer) == 0)) { 
-					state = STATE_TX_GRAB;
-				} else if ((strcmp("data", _buffer) == 0)
-					|| (strcmp("d", _buffer) == 0)) { 
-					state = STATE_TX_DATA;
-				} else if (strcmp(LINSEN_EXP_READ_STRING, _buffer) == 0) {
-					state = STATE_TX_EXPOSURE;
-				} else if (strcmp(LINSEN_PXI_CLK_READ_STRING, _buffer) == 0) {
-					state = STATE_TX_PIXELCLOCK;
-				} else if (strcmp(LINSEN_BRIGHT_READ_STRING, _buffer) == 0) {
-					state = STATE_TX_BRIGHTNESS;
-				} else if (strcmp(LINSEN_RESULT_READ_STRING, _buffer) == 0) {
-					state = STATE_TX_RESULT;
-				} else if (strcmp(LINSEN_RES_ID_READ_STRING, _buffer) == 0) {
-					state = STATE_TX_RESULT_ID;
-				} else if (strcmp(LINSEN_DATA_READ_STRING, _buffer) == 0) {
-					state = STATE_TX_DATA;
-				} else if (strcmp(LINSEN_RAW_READ_STRING, _buffer) == 0) {
-					state = STATE_TX_GRAB;
-				} else if ((strcmp("quit", _buffer) == 0)
-					|| (strcmp("exit", _buffer) == 0) 
-					|| (strcmp("q", _buffer) == 0)) { 
-					state = STATE_EXIT;
-				} else state = STATE_TX_UNKNOWN;
+			if (parsed >= received) {
+				result = linSen_socket_receive(accepted_socket, &_buffer, &received);
+				if (result < 0) {
+					if (errno != EAGAIN) {
+						printf("\treceive failed with error %d: %s\n", errno, strerror(errno));
+						return result;
+					} else break;
+				} else if (result > 0) {
+					printf("\treceived %d bytes: \"%s\"!\n", received, _buffer);
+					state = STATE_PARSE;
+					parsed = 0;
+				}
+			} else state = STATE_PARSE;
+		}
+		case STATE_PARSE: {
+			static char* parse_buffer;
+
+			parse_buffer = &_buffer[parsed];
+			
+			// parse received command
+			if ((strcmp("grab", parse_buffer) == 0)
+				|| (strcmp("g", parse_buffer) == 0)) { 
+				state = STATE_TX_GRAB;
+			} else if ((strcmp("data", parse_buffer) == 0)
+				|| (strcmp("d", parse_buffer) == 0)) { 
+				state = STATE_TX_DATA;
+			} else if (strcmp(LINSEN_EXP_READ_STRING, parse_buffer) == 0) {
+				state = STATE_TX_EXPOSURE;
+			} else if (strcmp(LINSEN_PIX_CLK_READ_STRING, parse_buffer) == 0) {
+				state = STATE_TX_PIXELCLOCK;
+			} else if (strcmp(LINSEN_BRIGHT_READ_STRING, parse_buffer) == 0) {
+				state = STATE_TX_BRIGHTNESS;
+			} else if (strcmp(LINSEN_RESULT_READ_STRING, parse_buffer) == 0) {
+				state = STATE_TX_RESULT;
+			} else if (strcmp(LINSEN_RES_ID_READ_STRING, parse_buffer) == 0) {
+				state = STATE_TX_RESULT_ID;
+			} else if (strcmp(LINSEN_DATA_READ_STRING, parse_buffer) == 0) {
+				state = STATE_TX_DATA;
+			} else if (strcmp(LINSEN_RAW_READ_STRING, parse_buffer) == 0) {
+				state = STATE_TX_GRAB;
+			} else if (strncmp(LINSEN_EXP_WRITE_STRING, parse_buffer, strlen(LINSEN_EXP_WRITE_STRING)) == 0) {
+				printf("\treceived set exposure: %s\n", parse_buffer);
+				int _val = atoi(&parse_buffer[strlen(LINSEN_EXP_WRITE_STRING)]);
+				linSen_set_exposure(_val);
+				printf("\textracted value %d\n", _val);
+				state = STATE_RX;
+			} else if (strncmp(LINSEN_PIX_CLK_WRITE_STRING, parse_buffer, strlen(LINSEN_EXP_WRITE_STRING)) == 0) {
+				printf("\treceived set pixel clock: %s\n", parse_buffer);
+				int _val = atoi(&parse_buffer[strlen(LINSEN_PIX_CLK_WRITE_STRING)]);
+				linSen_set_pxclk(_val);
+				printf("\textracted value %d\n", _val);
+				state = STATE_RX;
+			} else if (strncmp(LINSEN_BRIGHT_WRITE_STRING, parse_buffer, strlen(LINSEN_EXP_WRITE_STRING)) == 0) {
+				printf("\treceived set birghtness: %s\n", parse_buffer);
+				int _val = atoi(&parse_buffer[strlen(LINSEN_BRIGHT_WRITE_STRING)]);
+				linSen_set_brightness(_val);
+				printf("\textracted value %d\n", _val);
+				state = STATE_RX;
+			} else if ((strcmp("quit", parse_buffer) == 0)
+				|| (strcmp("exit", parse_buffer) == 0) 
+				|| (strcmp("q", parse_buffer) == 0)) { 
+				state = STATE_EXIT;
+			} else state = STATE_TX_UNKNOWN;
+			
+			parsed = (int)strchr(parse_buffer, '\0') - (int)_buffer + 1;
+			
+			if (parsed < received) {
+				//~ printf("\tgot %d bytes - parsed only: %d\n", received, parsed);
+				//~ printf("\tmissed: %s\n", &_buffer[parsed]);
+			} else {
 				free(_buffer);
 			}
+			
 			break;
 		}
 		case STATE_TX_BRIGHTNESS: {
@@ -227,8 +266,8 @@ int linSen_socket_server_process(void) {
 		case STATE_TX_PIXELCLOCK: {
 			result = linSen_get_pxclk();
 			
-			char tx_str[strlen(LINSEN_PXI_CLK_READ_STRING) + strlen(DEFTOSTRING(INT_MAX))];
-			sprintf(tx_str, "%s%d", LINSEN_PXI_CLK_READ_STRING, result);
+			char tx_str[strlen(LINSEN_PIX_CLK_READ_STRING) + strlen(DEFTOSTRING(INT_MAX))];
+			sprintf(tx_str, "%s%d", LINSEN_PIX_CLK_READ_STRING, result);
 			_buffer_size = strlen(tx_str);
 			_buffer = malloc(_buffer_size);
 			memcpy(_buffer, tx_str, _buffer_size);
@@ -345,10 +384,6 @@ int linSen_socket_client_init(const char *addr) {
 	return connect(client_socket, (struct sockaddr *) &address, sizeof(address));
 }
 
-int linSen_socket_client_process(void) {
-	return EXIT_SUCCESS;
-}
-
 int linSen_socket_client_read(char* str, int *val) {
 	char* recv_str;
 	int len, result;
@@ -411,4 +446,42 @@ int linSen_socket_client_read(char* str, int *val) {
 	return result;
 }
 	
+int linSen_socket_client_write(const char* str, int val) {
+	int result;
+	static char* _buffer;
+	static int _buffer_size;
+
+	printf("linSen_socket_client_write(%s,%d) called\n",str,val);
+
+	if (client_socket > 0) {
+		if (strcmp(LINSEN_EXP_WRITE_STRING, str) == 0) {
+			char tx_str[strlen(LINSEN_EXP_WRITE_STRING) + strlen(DEFTOSTRING(INT_MAX))];
+			sprintf(tx_str, "%s%d", LINSEN_EXP_WRITE_STRING, val);
+			_buffer_size = strlen(tx_str) + 1;
+			_buffer = malloc(_buffer_size);
+			memcpy(_buffer, tx_str, _buffer_size);
+		} else if (strcmp(LINSEN_PIX_CLK_WRITE_STRING, str) == 0) {
+			char tx_str[strlen(LINSEN_PIX_CLK_WRITE_STRING) + strlen(DEFTOSTRING(INT_MAX))];
+			sprintf(tx_str, "%s%d", LINSEN_PIX_CLK_WRITE_STRING, val);
+			_buffer_size = strlen(tx_str) + 1;
+			_buffer = malloc(_buffer_size);
+			memcpy(_buffer, tx_str, _buffer_size);
+		} else if (strcmp(LINSEN_BRIGHT_WRITE_STRING, str) == 0) {
+			char tx_str[strlen(LINSEN_BRIGHT_WRITE_STRING) + strlen(DEFTOSTRING(INT_MAX))];
+			sprintf(tx_str, "%s%d", LINSEN_BRIGHT_WRITE_STRING, val);
+			_buffer_size = strlen(tx_str) + 1;
+			_buffer = malloc(_buffer_size);
+			memcpy(_buffer, tx_str, _buffer_size);
+		} else return -1;
+
+		result = linSen_socket_send(client_socket, _buffer, _buffer_size);
+		free(_buffer);
+		if (result < 0) {
+			printf("\tsend failed with error %d: %s\n", errno, strerror(errno));
+		} else {
+			printf("\tsend %d bytes!\n", result);
+		}
+		return result;
+	} else return -1;
+}
 	

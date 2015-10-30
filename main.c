@@ -11,6 +11,9 @@
 #include "linSen.h"
 #include "i2c.h"
 #include "linSen-socket.h"
+#ifdef GTK_GUI
+#include "gtk-viewer.h"
+#endif //GTK_GUI
 
 
 static uint8_t automatic = 0;
@@ -170,11 +173,15 @@ static void parse_opts(int argc, char *argv[])
 }
 
 void sig_handler(int signo) {
+static int repeatedly = 0;
+
 	switch (signo) {
 		case SIGINT:
 			socket_client = 0;
 			socket_server = 0;
 			continuous = 0;
+			
+			if (repeatedly++) exit(EXIT_SUCCESS);
 			break;
 		default:;
 	}	
@@ -194,7 +201,7 @@ int main(int argc, char *argv[])
 		return EXIT_SUCCESS;
 	}
 	
-	//~ if (signal(SIGINT, sig_handler) == SIG_ERR) printf("can't catch SIGINT\n");
+	if (signal(SIGINT, sig_handler) == SIG_ERR) printf("can't catch SIGINT\n");
 
 	parse_opts(argc, argv);
 
@@ -245,6 +252,12 @@ int main(int argc, char *argv[])
 		else printf(" ...finished\n");
 	}
 	
+#ifdef GTK_GUI
+	viewer_init(&argc, &argv);
+#else
+	printf("no GUI supported for current host OS configuration\n");
+#endif //GTK_GUI
+
 	if (!continuous && (i2c || socket_client)) {
 		if (val_read) {
 			if (bright) printf("brightness: %d\n", linSen_get_brightness());
@@ -255,16 +268,20 @@ int main(int argc, char *argv[])
 		
 		if (val_write) {
 			if (bright) {
-				printf("set brightness set point to %d\n", bright_val);
-				linSen_set_brightness(bright_val);
+				printf("set brightness set point to %d...", bright_val);
+				result = linSen_set_brightness(bright_val);
+				if (result < 0) printf("failed\n");
+				else printf("done\n");
 			}
 			if (pxclk) {
 				printf("set pixel clock to %d kHz\n", pxclk_val);
 				linSen_set_pxclk(pxclk_val);
 			}
 			if (exp) {
-				printf("set exposure to %d µs\n", exp_val);
-				linSen_set_exposure(exp_val);
+				printf("set exposure to %d µs...", exp_val);
+				result = linSen_set_exposure(exp_val);
+				if (result < 0) printf("failed\n");
+				else printf("done\n");
 			}
 		}
 		if (grab) {
@@ -304,17 +321,39 @@ int main(int argc, char *argv[])
 	while (continuous || socket_server) {
 		//~ printf("main loop\n");
 		if (continuous) {
-			//~ static int last_id = -1;
-			int _id = linSen_get_result_id();
-//			if (last_id != _id) {
-				fprintf(stdout, "%d\t", _id);
-				if (bright) fprintf(stdout, "%d\t", linSen_get_brightness());
-				if (pxclk) fprintf(stdout, "%d\t", linSen_get_pxclk());
-				if (exp) fprintf(stdout, "%d\t" , linSen_get_exposure());
-				if (g_result) fprintf(stdout, "%d\t", linSen_get_global_result());
+			linSen_data_t linSen_data;
+			static int last_id = -1;
+
+			result = linSen_get_data(&linSen_data);
+
+			if (result < 0) {
+			} else if (last_id != linSen_data.result_id) {
+				printf("%d\t", linSen_data.result_id);
+				//~ fprintf(stdout, "%d\t", _id);
+				if (bright) fprintf(stdout, "%d\t", linSen_data.result_id);
+				if (pxclk) fprintf(stdout, "%d\t", linSen_data.pixel_clock);
+				if (exp) fprintf(stdout, "%d\t" , linSen_data.exposure);
+				if (g_result) fprintf(stdout, "%d\t", linSen_data.global_result);
 				fprintf(stdout, "\n");
-				//~ last_id = _id;
-//			}
+				
+				if (grab) {
+					uint16_t* frame;
+
+					frame = malloc(linSen_data.pixel_number_x * linSen_data.pixel_number_y * sizeof(uint16_t));
+					result = linSen_get_raw(frame, linSen_data.pixel_number_x * linSen_data.pixel_number_y);
+				
+					if (result) {
+#ifdef GTK_GUI						
+						if (viewer_set_image(frame, linSen_data.pixel_number_x, linSen_data.pixel_number_y) == EXIT_FAILURE) {
+						// exit
+						break;
+						}
+						viewer_update();
+#endif //GTK_GUI
+					}
+				}
+				last_id = linSen_data.result_id;
+			}
 		}
 		
 		// socket
