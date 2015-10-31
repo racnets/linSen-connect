@@ -201,22 +201,21 @@ int linSen_socket_server_process(void) {
 			} else if (strcmp(LINSEN_RAW_READ_STRING, parse_buffer) == 0) {
 				state = STATE_TX_GRAB;
 			} else if (strncmp(LINSEN_EXP_WRITE_STRING, parse_buffer, strlen(LINSEN_EXP_WRITE_STRING)) == 0) {
-				printf("\treceived set exposure: %s\n", parse_buffer);
 				int _val = atoi(&parse_buffer[strlen(LINSEN_EXP_WRITE_STRING)]);
+				printf("\treceived(%s): set exposure to %d!\n", parse_buffer, _val);
 				linSen_set_exposure(_val);
-				printf("\textracted value %d\n", _val);
 				state = STATE_RX;
 			} else if (strncmp(LINSEN_PIX_CLK_WRITE_STRING, parse_buffer, strlen(LINSEN_EXP_WRITE_STRING)) == 0) {
-				printf("\treceived set pixel clock: %s\n", parse_buffer);
 				int _val = atoi(&parse_buffer[strlen(LINSEN_PIX_CLK_WRITE_STRING)]);
+				printf("\treceived(%s): set pixel clock to %d!\n", parse_buffer, _val);
 				linSen_set_pxclk(_val);
-				printf("\textracted value %d\n", _val);
+				//~ printf("\textracted value %d\n", _val);
 				state = STATE_RX;
 			} else if (strncmp(LINSEN_BRIGHT_WRITE_STRING, parse_buffer, strlen(LINSEN_EXP_WRITE_STRING)) == 0) {
-				printf("\treceived set birghtness: %s\n", parse_buffer);
 				int _val = atoi(&parse_buffer[strlen(LINSEN_BRIGHT_WRITE_STRING)]);
+				printf("\treceived(%s): set birghtness to %d!\n", parse_buffer, _val);
 				linSen_set_brightness(_val);
-				printf("\textracted value %d\n", _val);
+				//~ printf("\textracted value %d\n", _val);
 				state = STATE_RX;
 			} else if ((strcmp("quit", parse_buffer) == 0)
 				|| (strcmp("exit", parse_buffer) == 0) 

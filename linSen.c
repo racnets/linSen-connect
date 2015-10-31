@@ -232,7 +232,7 @@ int linSen_get_data(linSen_data_t* data){
 					data->pixel_number_y = buffer[5];
 					data->result_scalar_number = buffer[6];
 					data->result_id = buffer[7];
-					data->global_result = buffer[8];		
+					data->global_result = (int8_t)buffer[8];
 				}
 				break;
 			}

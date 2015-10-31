@@ -348,6 +348,7 @@ int main(int argc, char *argv[])
 						// exit
 						break;
 						}
+						viewer_set_data(&linSen_data);
 						viewer_update();
 #endif //GTK_GUI
 					}
