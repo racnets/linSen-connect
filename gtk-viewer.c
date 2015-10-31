@@ -131,86 +131,53 @@ int viewer_init(int *argc, char **argv[]) {
     //~ gtk_box_pack_...(*box, *child, expand, fill, padding);
 	//~ gtk_adjustment_new(gdouble value, gdouble lower, gdouble upper, gdouble step_increment, gdouble page_increment, gdouble page_size);
 	// global container
-	box = gtk_vbox_new(FALSE, spacing);	
+	box = gtk_vbox_new(FALSE, 0);	
+	gtk_container_add(GTK_CONTAINER(window), box);	
 
 
-	// 1st box: linSen setting values
+	// 1st grid: linSen setting values
 	grid = gtk_widget_new(GTK_TYPE_TABLE, "n-columns", 6, "n-rows", 3, "column-spacing", 0, "row-spacing", 0, FALSE);
-    gtk_box_pack_start(GTK_BOX(box), grid, FALSE, FALSE, spacing);
+    gtk_box_pack_start(GTK_BOX(box), grid, FALSE, FALSE, small_spacing);
 	
-
 	// 1st column: labels
-	//~ hbox = gtk_hbox_new(FALSE, 0);
-    //~ vbox = gtk_vbox_new(TRUE, 0);
 	label = gtk_widget_new(GTK_TYPE_LABEL, "label", "exposure:", "xalign", 1.0, NULL);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
     gtk_table_attach(GTK_TABLE(grid), label, 0, 1, 0, 2, GTK_FILL, GTK_SHRINK, small_spacing, 0);
 	label = gtk_widget_new(GTK_TYPE_LABEL, "label", "pixel clock:", "xalign", 1.0, NULL);
     gtk_table_attach(GTK_TABLE(grid), label, 0, 1, 2, 4, GTK_FILL, GTK_SHRINK, small_spacing, 0);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 	label = gtk_widget_new(GTK_TYPE_LABEL, "label", "average brightness:", "xalign", 1.0, NULL);
     gtk_table_attach(GTK_TABLE(grid), label, 0, 1, 4, 6, GTK_FILL, GTK_SHRINK, small_spacing, 0);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
-    //~ gtk_box_pack_start(GTK_BOX(hbox), vbox, FALSE, FALSE, small_spacing);
 
-	// 2nd column: value fields
-    //~ vbox = gtk_vbox_new(TRUE, 0);
-//~ 
-    //~ vvbox = gtk_vbox_new(FALSE, 0);
+	// 2nd column: value fields & slider
     spin_button = gtk_widget_new(GTK_TYPE_SPIN_BUTTON, "digits", 0, "numeric", 1, "width-chars", 6, "xalign", 1.0, NULL);
 	exposure_adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button));
     g_signal_connect(exposure_adj, "value_changed", G_CALLBACK(cb_exposure_adj_value_change), NULL);
-    //~ gtk_box_pack_start(GTK_BOX(vvbox), spin_button, TRUE, FALSE, 0);
     gtk_table_attach(GTK_TABLE(grid), spin_button, 1, 2, 0, 1, GTK_FILL, GTK_SHRINK, small_spacing, 0);
 	exposure_slider = gtk_widget_new(GTK_TYPE_HSCALE, "digits", 0, "draw-value", 0, NULL);
 	gtk_range_set_adjustment(GTK_RANGE(exposure_slider), exposure_adj);
-    //~ gtk_box_pack_start(GTK_BOX(vvbox), exposure_slider, TRUE, TRUE, 0);
     gtk_table_attach(GTK_TABLE(grid), exposure_slider, 1, 3, 1, 2, GTK_FILL, GTK_SHRINK, 0, 0);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), vvbox, TRUE, TRUE, 0);
-//~ 
-    //~ vvbox = gtk_vbox_new(FALSE, 0);
+
     spin_button = gtk_widget_new(GTK_TYPE_SPIN_BUTTON, "digits", 0, "numeric", 1, "width-chars", 6, "xalign", 1.0, NULL);
 	pixel_clock_adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button));
     g_signal_connect(pixel_clock_adj, "value_changed", G_CALLBACK(cb_pixel_clock_adj_value_change), NULL);
-    //~ gtk_box_pack_start(GTK_BOX(vvbox), spin_button, TRUE, FALSE, 0);  
     gtk_table_attach(GTK_TABLE(grid), spin_button, 1, 2, 2, 3, GTK_FILL, GTK_SHRINK, small_spacing, 0);
 	pixel_clock_slider = gtk_widget_new(GTK_TYPE_HSCALE, "digits", 0, "draw-value", 0, NULL);
 	gtk_range_set_adjustment(GTK_RANGE(pixel_clock_slider), pixel_clock_adj);
-    //~ gtk_box_pack_start(GTK_BOX(vvbox), pixel_clock_slider, TRUE, TRUE, 0);
     gtk_table_attach(GTK_TABLE(grid), pixel_clock_slider, 1, 3, 3, 4, GTK_FILL, GTK_SHRINK, 0, 0);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), vvbox, TRUE, TRUE, 0);
-//~ 
-    //~ vvbox = gtk_vbox_new(FALSE, 0);
+
     spin_button = gtk_widget_new(GTK_TYPE_SPIN_BUTTON, "digits", 0, "numeric", 1, "width-chars", 6, "xalign", 1.0, NULL);
 	brightness_adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button));
 	gtk_adjustment_configure(brightness_adj, 0, 0, 0x0FFF, 1, 0, 0);
     g_signal_connect(brightness_adj, "value_changed", G_CALLBACK(cb_brightness_adj_value_change), NULL);
-    //~ gtk_box_pack_start(GTK_BOX(vvbox), spin_button, TRUE, FALSE, 0);  
     gtk_table_attach(GTK_TABLE(grid), spin_button, 1, 2, 4, 5, GTK_FILL, GTK_SHRINK, small_spacing, 0);
 	brightness_slider = gtk_widget_new(GTK_TYPE_HSCALE, "digits", 0, "draw-value", 0, NULL);
 	gtk_range_set_adjustment(GTK_RANGE(brightness_slider), brightness_adj);
-    //~ gtk_box_pack_start(GTK_BOX(vvbox), brightness_slider, TRUE, TRUE, 0);
     gtk_table_attach(GTK_TABLE(grid), brightness_slider, 1, 3, 5, 6, GTK_FILL, GTK_SHRINK, 0, 0);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), vvbox, TRUE, TRUE, 0);
-//~ 
-    //~ gtk_box_pack_start(GTK_BOX(hbox), vbox, TRUE, FALSE, 0);
     
 	// 3rd column: units
-    //~ vbox = gtk_vbox_new(TRUE, spacing);
 	label = gtk_widget_new(GTK_TYPE_LABEL, "label", "µs", "xalign", 0, NULL);
     gtk_table_attach(GTK_TABLE(grid), label, 2, 3, 0, 1, GTK_FILL, GTK_SHRINK, small_spacing, 0);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, TRUE, 0);
 	label = gtk_widget_new(GTK_TYPE_LABEL, "label", "kHz", "xalign", 0, NULL);
     gtk_table_attach(GTK_TABLE(grid), label, 2, 3, 2, 3, GTK_FILL, GTK_SHRINK, small_spacing, 0);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, TRUE, 0);
-	//~ label = gtk_widget_new(GTK_TYPE_LABEL, "label", "", "xalign", 0, NULL);
-    //~ gtk_table_attach_defaults(GTK_TABLE(grid), label, 2, 3, 4, 6);
-    //~ gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, TRUE, 0);
-    //~ gtk_box_pack_start(GTK_BOX(hbox), vbox, TRUE, TRUE, 0);
-	//~ 
-    //~ gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, spacing);
-    
-    gtk_box_pack_start(GTK_BOX(box), grid, FALSE, FALSE, spacing);
 
 	hSeparator = gtk_hseparator_new();
     gtk_box_pack_start(GTK_BOX(box), hSeparator, FALSE, FALSE, 0);
@@ -218,7 +185,6 @@ int viewer_init(int *argc, char **argv[]) {
 
 	// 2nd box: linSen output
 	// create drawing area
-	hbox = gtk_hbox_new(TRUE, spacing);
 	darea = gtk_drawing_area_new();
 	// add area to window
     gtk_box_pack_start(GTK_BOX(box), darea, TRUE, TRUE, 0);
@@ -228,25 +194,25 @@ int viewer_init(int *argc, char **argv[]) {
     
     
     // 3rd box: results
-	hbox = gtk_hbox_new(TRUE, spacing);
-	result_slider = gtk_widget_new(GTK_TYPE_HSCALE, "digits", 0, "draw-value", 1, "sensitive", 0, NULL);
+	result_slider = gtk_widget_new(GTK_TYPE_HSCALE, "digits", 0, "draw-value", 1, "sensitive", 0, "show-fill-level", 1, NULL);
+	gtk_scale_add_mark(GTK_SCALE(result_slider), 0, GTK_POS_TOP, NULL);
+	gtk_scale_add_mark(GTK_SCALE(result_slider), 0, GTK_POS_BOTTOM, NULL);
 	result_adj = gtk_range_get_adjustment(GTK_RANGE(result_slider));
-	gtk_adjustment_configure(result_adj, 0, -100, 100, 1, 0, 0);
-    gtk_box_pack_start(GTK_BOX(hbox), result_slider, TRUE, TRUE, 0);
+	gtk_adjustment_configure(result_adj, 0, -10, 10, 1, 0, 0);
+    gtk_box_pack_start(GTK_BOX(box), result_slider, FALSE, TRUE, small_spacing);
 
-    gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, 0);
+    //~ gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, 0);
 
 	hSeparator = gtk_hseparator_new();
     gtk_box_pack_start(GTK_BOX(box), hSeparator, FALSE, FALSE, 0);
 
     
     // 4rd box: control button(s)
-	hbox = gtk_hbox_new(TRUE, spacing);
+	hbox = gtk_hbox_new(FALSE, 0);
 	button = gtk_widget_new(GTK_TYPE_BUTTON, "label", "quit", NULL);
     g_signal_connect(button, "clicked", G_CALLBACK(on_destroy_event), NULL);
     gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, FALSE, 0);
-
-    gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, small_spacing);
 
 	hSeparator = gtk_hseparator_new();
     gtk_box_pack_start(GTK_BOX(box), hSeparator, FALSE, FALSE, 0);
@@ -255,19 +221,17 @@ int viewer_init(int *argc, char **argv[]) {
     // 5rd box: helper values
 	hbox = gtk_hbox_new(FALSE, 0);
 	frame_label = gtk_widget_new(GTK_TYPE_LABEL, "label", "0", "xalign", 0, NULL);
-    gtk_box_pack_start(GTK_BOX(hbox), frame_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox), frame_label, FALSE, FALSE, small_spacing);
 
 	size_label = gtk_widget_new(GTK_TYPE_LABEL, "label", "0", "xalign", 0, NULL);
-    gtk_box_pack_start(GTK_BOX(hbox), size_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox), size_label, FALSE, FALSE, small_spacing);
 
 	local_result_number_label = gtk_widget_new(GTK_TYPE_LABEL, "label", "0", "xalign", 0, NULL);
-    gtk_box_pack_start(GTK_BOX(hbox), local_result_number_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox), local_result_number_label, FALSE, FALSE, small_spacing);
 
     gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, 0);
 
 
-//	gtk_container_add(GTK_CONTAINER(window), darea);	
-	gtk_container_add(GTK_CONTAINER(window), box);	
 	// connect events - "draw" for gtk3
 	g_signal_connect(G_OBJECT(darea), "expose-event", G_CALLBACK(on_draw_event), NULL); 
 
@@ -281,7 +245,6 @@ int viewer_init(int *argc, char **argv[]) {
 }
 
 void viewer_update() {
-	//~ gtk_main();
 	while(gtk_events_pending())
 		gtk_main_iteration();
 }
