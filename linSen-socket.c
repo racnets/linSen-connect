@@ -31,9 +31,10 @@ int linSen_socket_receive(int dev, char** val, int* len) {
 	int result;
 	
 	result = recv(dev, buffer, BUF-1, MSG_DONTWAIT);
-	if( result > 0) {
-		buffer[result++] = '\0';
-	} else return result;
+	//~ if( result > 0) {
+		//~ if (buffer[result] != '\0') buffer[result++] = '\0';
+	//~ } else return result;
+	if (result <= 0) return result;
 	
 	*len = result;
 	*val = malloc(result);
@@ -56,7 +57,8 @@ int linSen_socket_send(int dev, char* val, int len) {
  * sends string
  */
 int linSen_socket_send_string(int dev, char* val) {
-	return linSen_socket_send(dev, val, strlen(val));
+	/* send string - including null-termination */
+	return linSen_socket_send(dev, val, strlen(val)+1);
 }
 
 /*
@@ -221,7 +223,10 @@ int linSen_socket_server_process(void) {
 				|| (strcmp("exit", parse_buffer) == 0) 
 				|| (strcmp("q", parse_buffer) == 0)) { 
 				state = STATE_EXIT;
-			} else state = STATE_TX_UNKNOWN;
+			} else {
+				printf("couldn't parse: \"%s\"\n", parse_buffer);
+				state = STATE_TX_UNKNOWN;
+			}
 			
 			parsed = (int)strchr(parse_buffer, '\0') - (int)_buffer + 1;
 			
@@ -341,6 +346,7 @@ int linSen_socket_server_process(void) {
 				printf("\tsend failed with error %d: %s\n", errno, strerror(errno));
 				return result;
 			} else {
+				//~ printf("\tsend %d bytes: \"%s\" !\n", result, _buffer);
 				printf("\tsend %d bytes!\n", result);
 				state = STATE_RX;
 			}			
@@ -352,7 +358,7 @@ int linSen_socket_server_process(void) {
 				printf("\tsend failed with error %d: %s\n", errno, strerror(errno));
 				return result;
 			} else {
-				printf("\tsend %d bytes!\n", result);
+				printf("\tsend %d bytes: \"unknown\" !\n", result);
 				state = STATE_RX;
 			}			
 			break;

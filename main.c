@@ -15,44 +15,59 @@
 #include "gtk-viewer.h"
 #endif //GTK_GUI
 
+/* log file */
+static const char *log_file = NULL;
 
-static uint8_t automatic = 0;
-static const char *file = NULL;
+/* continous mode */
+static int continuous = 0;
 
-static uint8_t continuous = 0;
-static uint8_t verbose = 0;
+/* verbose level */
+static int verbose = 0;
 
 /* interfaces */
-static uint8_t i2c = 0;
+/* i2c */
+static int i2c = 0;
 static const char* i2c_dev = "/dev/i2c-0";
-
-static uint8_t socket_client = 0;
-static uint8_t socket_server = 0;
+/* socket */
+static int socket_client = 0;
+static int socket_server = 0;
 static char* socket_server_addr = NULL;
 
-static uint8_t val_read = 0;
-static uint8_t val_write = 0;
-static uint8_t bright = 0;
-static uint16_t bright_val = 0;
-static uint8_t pxclk = 0;
-static uint16_t pxclk_val = 0;
-static uint8_t exp = 0;
-static uint32_t exp_val = 0;
-static uint8_t g_result = 0;
-//~ static int16_t g_result_val = 0;
+/* commands */
+/* read */
+static int val_read = 0;
+/* write */
+static int val_write = 0;
 
-static uint8_t manual = 0;
-//~ static uint16_t readAddr;
-static uint16_t shutter = 0;
+/* read/write parameters */
+/* brightness r/w flag */
+static int bright = 0;
+/* brightness value */
+static unsigned int bright_val = 0;
+/* pixel clock r/w flag */
+static int pxclk = 0;
+/* pixel clock value */
+static unsigned int pxclk_val = 0;
+/* exposure r/w flag */
+static int exp = 0;
+/* exposure value */
+static unsigned int exp_val = 0;
+/* global result read flag */
+static int g_result = 0;
+/* grab read flag */
+static int grab = 0;
+
+
 static double time = 0;
-static uint8_t grab = 0;
 
+/* get time in seconds */
 double getTime() {
 	struct timeval tp;
 	gettimeofday( &tp, NULL );
 	return tp.tv_sec + tp.tv_usec/1E6;
 }
 
+/* print usage */
 static void print_usage(const char *prog)
 {
 	printf("\nUsage: %s [-cvX][-BEiP[arg]][-fkt arg]\n", prog);
@@ -75,15 +90,15 @@ static void print_usage(const char *prog)
 	exit(1);
 }
 
+/* options parser */
 static void parse_opts(int argc, char *argv[])
 {
-	//forbid error message
+	// forbid error message
 	opterr=0;
 
 	while (1) {
 		static const struct option lopts[] = {
 			{ "device",  required_argument, 0, 'D' },
-			{ "shutter", required_argument, 0, 'S' },
 			{ "file",    required_argument, 0, 'f' },
 			{ "grab",    no_argument,       0, 'g' },
 			{ "help",    no_argument,       0, 'h' },
@@ -103,7 +118,12 @@ static void parse_opts(int argc, char *argv[])
 		};
 		int c;
 
-		c = getopt_long(argc, argv, "D:f:i::k::S:t:B::E::P::acghmrvwX", lopts, NULL);
+		/*
+		 * :	required argument
+		 * ::	optional argument
+		 * 		no_argument
+		*/
+		c = getopt_long(argc, argv, "D:f:i::k::t:B::E::P::cghrvwX", lopts, NULL);
 
 		if (c == -1)
 			break;
@@ -143,17 +163,8 @@ static void parse_opts(int argc, char *argv[])
 			case 'v':
 				verbose = 1;
 				break;
-			case 'a':
-				automatic = 1;
-				break;
 			case 't':
 				time = atof(optarg);
-				break;
-			case 'S':
-				shutter = atoi(optarg);
-				break;
-			case 'm':
-				manual = 1;
 				break;
 			case 'k':
 				if (optarg) {
@@ -162,7 +173,7 @@ static void parse_opts(int argc, char *argv[])
 				} else socket_server = 1;
 				break;
 			case 'f':
-				file = optarg;
+				log_file = optarg;
 				break;
 			case 'h':
 				print_usage(argv[0]);
@@ -172,8 +183,11 @@ static void parse_opts(int argc, char *argv[])
 	}
 }
 
+/* signal handler 
+ * safely terminates the program
+ */
 void sig_handler(int signo) {
-static int repeatedly = 0;
+	static int repeatedly = 0;
 
 	switch (signo) {
 		case SIGINT:
@@ -187,30 +201,32 @@ static int repeatedly = 0;
 	}	
 }
 
-int main(int argc, char *argv[])
-{
-	//~ int fd;
-	//~ FILE* lfd = NULL;
-	//~ double t, t0;
+int main(int argc, char *argv[]) {
 	int result;
+	// log file descriptor
+	FILE* lfd = NULL;
 
 	printf("\nlinSen connect tool\n\n");
-	
+
 	if (argc < 2) {
 		print_usage(argv[0]);
 		return EXIT_SUCCESS;
 	}
-	
+
+	// set up signal handler
 	if (signal(SIGINT, sig_handler) == SIG_ERR) printf("can't catch SIGINT\n");
 
+	// optional argument parser
 	parse_opts(argc, argv);
-
+	
+	// check, if not more than one client interface was declared 
 	if (i2c && socket_client) {
 		printf("can't use i2c and client socket interface simultaneously! Set socket to server functionality, instead!\n");
 		socket_client = 0;
 		socket_server = 1;
 	}
-	
+
+	// i2c interface
 	if (i2c) {
 		// setup & initalize i2c
 		printf("setup i2c via: %s", i2c_dev);
@@ -222,6 +238,7 @@ int main(int argc, char *argv[])
 		} else printf(" ...finished\n");
 	}
 
+	// socket client interface
 	if (socket_client) {
 		// setup & initalize socket as client
 		printf("setup socket as client via: %s", socket_server_addr);
@@ -234,12 +251,14 @@ int main(int argc, char *argv[])
 		else printf(" ...finished\n");
 	}
 	
+	// check, if at least one interface was declared
 	if (!i2c && !socket_client) {
 		printf("no valid linSen-interface defined!\n");
 		print_usage(argv[0]);
 		return EXIT_SUCCESS;	
 	}
 	
+	// socket server interface
 	if (socket_server) {
 		// setup & initalize socket as server
 		printf("setup socket as server");
@@ -252,12 +271,19 @@ int main(int argc, char *argv[])
 		else printf(" ...finished\n");
 	}
 	
+	if (log_file != NULL) {
+		lfd = fopen(log_file, "w");
+	} else lfd = stdout;
+	
+	// GUI interface
 #ifdef GTK_GUI
+	// set up GUI
 	viewer_init(&argc, &argv);
 #else
 	printf("no GUI supported for current host OS configuration\n");
 #endif //GTK_GUI
 
+	// CLI print out presentation
 	if (!continuous && (i2c || socket_client)) {
 		if (val_read) {
 			if (bright) printf("brightness: %d\n", linSen_get_brightness());
@@ -311,11 +337,11 @@ int main(int argc, char *argv[])
 			}
 	} else {
 		/* build header */
-		if (bright) fprintf(stdout, "brightness\t");
-		if (pxclk) fprintf(stdout, "pixel clock\t");
-		if (exp) fprintf(stdout, "exposure\t");
-		if (g_result) fprintf(stdout, "global result\t");
-		fprintf(stdout, "\n");
+		if (bright) fprintf(lfd, "brightness\t");
+		if (pxclk) fprintf(lfd, "pixel clock\t");
+		if (exp) fprintf(lfd, "exposure\t");
+		if (g_result) fprintf(lfd, "global result\t");
+		fprintf(lfd, "\n");
 	}
 
 	while (continuous || socket_server) {
@@ -329,12 +355,12 @@ int main(int argc, char *argv[])
 			if (result < 0) {
 			} else if (last_id != linSen_data.result_id) {
 				printf("%d\t", linSen_data.result_id);
-				//~ fprintf(stdout, "%d\t", _id);
-				if (bright) fprintf(stdout, "%d\t", linSen_data.result_id);
-				if (pxclk) fprintf(stdout, "%d\t", linSen_data.pixel_clock);
-				if (exp) fprintf(stdout, "%d\t" , linSen_data.exposure);
-				if (g_result) fprintf(stdout, "%d\t", linSen_data.global_result);
-				fprintf(stdout, "\n");
+				//~ fprintf(lfd, "%d\t", _id);
+				if (bright) fprintf(lfd, "%d\t", linSen_data.result_id);
+				if (pxclk) fprintf(lfd, "%d\t", linSen_data.pixel_clock);
+				if (exp) fprintf(lfd, "%d\t" , linSen_data.exposure);
+				if (g_result) fprintf(lfd, "%d\t", linSen_data.global_result);
+				fprintf(lfd, "\n");
 				
 				if (grab) {
 					uint16_t* frame;
@@ -355,6 +381,7 @@ int main(int argc, char *argv[])
 				}
 				last_id = linSen_data.result_id;
 			}
+			viewer_update();
 		}
 		
 		// socket

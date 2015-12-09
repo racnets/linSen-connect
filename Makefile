@@ -10,7 +10,7 @@ DFLAGS =
 LDFLAGS =
 LDLIBS = 
 
-GUILIB = gtk+-2.0
+GUILIB = gtk+-3.0
 # add graphical output if supported by host system
 ifeq  ($(shell pkg-config --exists $(GUILIB) && echo 1), 1)
 	C_SRCS += gtk-viewer.c
