@@ -375,13 +375,15 @@ int main(int argc, char *argv[]) {
 						break;
 						}
 						viewer_set_data(&linSen_data);
-						viewer_update();
 #endif //GTK_GUI
 					}
 				}
 				last_id = linSen_data.result_id;
+#ifdef GTK_GUI						
+				viewer_update();
+#endif //GTK_GUI
+
 			}
-			viewer_update();
 		}
 		
 		// socket

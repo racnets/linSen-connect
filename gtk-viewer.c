@@ -20,19 +20,24 @@ GtkAdjustment* pixel_clock_adj;
 GtkAdjustment* brightness_adj;
 GtkAdjustment* result_adj;
 GtkWidget* exposure_slider;
+GtkWidget* exposure_toggle;
 GtkWidget* pixel_clock_slider;
+GtkWidget* pixel_clock_toggle;
 GtkWidget* brightness_slider;
+GtkWidget* brightness_toggle;
 GtkWidget* frame_label;    
 GtkWidget* size_label;    
 GtkWidget* local_result_number_label;
 GtkWidget* result_slider;
+GtkWidget* result_toggle;
 
 
 linSen_data_t linSen_data;
 
 #define PLOTTER_BUFFER 256
+#define PLOTTER_ITEMS  4
 struct {
-	int value[4][PLOTTER_BUFFER];
+	int value[PLOTTER_ITEMS][PLOTTER_BUFFER];
 	int write_pos;
 } plot_data;
 
@@ -88,38 +93,51 @@ static gboolean linSen_on_draw_event(GtkWidget* widget, cairo_t *cr, gpointer us
 	return TRUE;
 }
 
-static gboolean plotter_on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data) {      
-	int width = gtk_widget_get_allocated_width(widget);
-	int height = gtk_widget_get_allocated_height(widget);
-	double scale_w = (double)width / PLOTTER_BUFFER;
-	static double scale_h = 1.0;
+static void do_plot(cairo_t *cr, cairo_pattern_t *pattern, int index, double scale_w, int height) {
+	static double scale_h[PLOTTER_ITEMS] = {[0 ... (PLOTTER_ITEMS-1)] = 1.0};	
+	double _scale_h = scale_h[index];
+	scale_h[index] = height;
 
-	// white background
-	cairo_set_source_rgb(cr, 255, 255, 255); 
-	cairo_paint(cr);
+	cairo_set_source(cr, pattern);
+	cairo_set_line_width(cr,1);
+	cairo_save(cr);
 	
 	// rotate and scale - 
 	cairo_matrix_t matrix;
 	cairo_matrix_init(&matrix,
 		scale_w, 0,
-		0, -scale_h,
+		0, -_scale_h,
 		0, height
 	);
 	cairo_transform(cr, &matrix);
 
 	// plot
-	cairo_set_source_rgb(cr, 0, 255, 0);
-	cairo_set_line_width(cr,1);
 	int i;
 	for (i=0;i<PLOTTER_BUFFER;i++){
 		int pos = plot_data.write_pos - i;
 		if (pos < 0) pos += PLOTTER_BUFFER;
-		int date = plot_data.value[2][pos];
-		if ((date * scale_h) > height) scale_h = (double)height / date;
-
-		cairo_line_to(cr, i, date);
+		int date = plot_data.value[index][pos];
+		if ((date * scale_h[index]) > height) scale_h[index] = (double)height / date;
+			cairo_line_to(cr, i, date);
 	}
+	cairo_restore(cr);
 	cairo_stroke(cr);
+}
+
+static gboolean plotter_on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data) {      
+	int width = gtk_widget_get_allocated_width(widget);
+	int height = gtk_widget_get_allocated_height(widget);
+	double scale_w = (double)width / PLOTTER_BUFFER;
+
+	// white background
+	cairo_set_source_rgb(cr, 255, 255, 255); 
+	cairo_paint(cr);
+	//~ cairo_set_operator(cr, CAIRO_OPERATOR_ADD);
+
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(exposure_toggle))) do_plot(cr, cairo_pattern_create_rgb(1,0,0), 0, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(pixel_clock_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,1,0), 1, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brightness_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,0,1), 2, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(result_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,0,0), 3, scale_w, height);
 
 	return TRUE;
 }
@@ -246,7 +264,29 @@ int viewer_init(int *argc, char **argv[]) {
     gtk_box_pack_start(GTK_BOX(box), hSeparator, FALSE, FALSE, 0);
     
     
-	// 2nd box: plotter output
+	// 3rd box: plotter output
+	grid = gtk_grid_new();
+    gtk_box_pack_start(GTK_BOX(box), grid, FALSE, FALSE, 0);
+	label = gtk_label_new("plot:");
+    gtk_grid_attach(GTK_GRID(grid), label, 0, 0, 1, 1);
+    
+	exposure_toggle = gtk_toggle_button_new_with_label("exposure");
+   	gtk_widget_set_name(GTK_WIDGET(exposure_toggle), "exposure_toggle");
+    gtk_grid_attach(GTK_GRID(grid), exposure_toggle, 1, 0, 1, 1);
+	
+	pixel_clock_toggle = gtk_toggle_button_new_with_label("pixel clock");
+	gtk_widget_set_name(GTK_WIDGET(pixel_clock_toggle), "pixel_clock_toggle");
+	gtk_grid_attach(GTK_GRID(grid), pixel_clock_toggle, 2, 0, 1, 1);
+	
+	brightness_toggle = gtk_toggle_button_new_with_label("average brightness");
+  	gtk_widget_set_name(GTK_WIDGET(brightness_toggle), "brightness_toggle");
+	gtk_grid_attach(GTK_GRID(grid), brightness_toggle, 3, 0, 1, 1);
+	
+	result_toggle = gtk_toggle_button_new_with_label("result");
+   	gtk_widget_set_name(GTK_WIDGET(result_toggle), "result_toggle");
+	gtk_grid_attach(GTK_GRID(grid), result_toggle, 4, 0, 1, 1);
+	
+	
 	// create drawing area
 	darea = gtk_drawing_area_new();
 	g_signal_connect(G_OBJECT(darea), "draw", G_CALLBACK(plotter_on_draw_event), NULL);
@@ -387,6 +427,7 @@ int viewer_set_data(linSen_data_t* data) {
 	plot_data.value[0][plot_data.write_pos] = linSen_data.exposure;
 	plot_data.value[1][plot_data.write_pos] = linSen_data.pixel_clock;
 	plot_data.value[2][plot_data.write_pos] = linSen_data.brightness;
+	plot_data.value[3][plot_data.write_pos] = linSen_data.global_result;
 	
 	return EXIT_SUCCESS;
 }
