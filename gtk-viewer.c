@@ -94,31 +94,40 @@ static gboolean linSen_on_draw_event(GtkWidget* widget, cairo_t *cr, gpointer us
 }
 
 static void do_plot(cairo_t *cr, cairo_pattern_t *pattern, int index, double scale_w, int height) {
-	static double scale_h[PLOTTER_ITEMS] = {[0 ... (PLOTTER_ITEMS-1)] = 1.0};	
-	double _scale_h = scale_h[index];
-	scale_h[index] = height;
+	int max = 0;
+	int min = 0;	
+	int i;
+	// finds extrema
+	for (i=0;i<PLOTTER_BUFFER;i++){
+		int date = plot_data.value[index][i];
+		if (date > max) max = date;
+		else if (date < min) min = date;
+	}
+
+	// to calculate horizontal scale and zero-line
+	double scale_h = (max == min)? 1.0: (double)height / (max - min);
+	int neutral = max * scale_h;
+	printf("%d(%d,%d): scale_h: %f\tneutral: %d\n", index, min, max, scale_h, neutral);
 
 	cairo_set_source(cr, pattern);
 	cairo_set_line_width(cr,1);
 	cairo_save(cr);
 	
-	// rotate and scale - 
+	// rotate and scale
 	cairo_matrix_t matrix;
 	cairo_matrix_init(&matrix,
 		scale_w, 0,
-		0, -_scale_h,
-		0, height
+		0, -scale_h,
+		0, neutral
 	);
 	cairo_transform(cr, &matrix);
 
 	// plot
-	int i;
 	for (i=0;i<PLOTTER_BUFFER;i++){
 		int pos = plot_data.write_pos - i;
 		if (pos < 0) pos += PLOTTER_BUFFER;
 		int date = plot_data.value[index][pos];
-		if ((date * scale_h[index]) > height) scale_h[index] = (double)height / date;
-			cairo_line_to(cr, i, date);
+		cairo_line_to(cr, i, date);
 	}
 	cairo_restore(cr);
 	cairo_stroke(cr);
@@ -132,7 +141,6 @@ static gboolean plotter_on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer u
 	// white background
 	cairo_set_source_rgb(cr, 255, 255, 255); 
 	cairo_paint(cr);
-	//~ cairo_set_operator(cr, CAIRO_OPERATOR_ADD);
 
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(exposure_toggle))) do_plot(cr, cairo_pattern_create_rgb(1,0,0), 0, scale_w, height);
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(pixel_clock_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,1,0), 1, scale_w, height);
