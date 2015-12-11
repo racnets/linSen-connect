@@ -54,8 +54,8 @@ static int exp = 0;
 static unsigned int exp_val = 0;
 /* global result read flag */
 static int g_result = 0;
-/* grab read flag */
-static int grab = 0;
+/* gui read flag */
+static int gui = 0;
 
 
 static double time = 0;
@@ -73,7 +73,7 @@ static void print_usage(const char *prog)
 	printf("\nUsage: %s [-cvX][-BEiP[arg]][-fkt arg]\n", prog);
 	puts(" general\n"
 	     "  -f arg  --file=arg       log file to write to\n"
-	     "  -g      --grab           grab frame\n"
+	     "  -g      --gui            show GUI\n"
 	     "  -i[dev] --i2c[=dev]      use i2c interface - default /dev/i2c-0\n"
 	     "  -k[arg]  --socket        provides socket server interface if arg is empty, otherwise use socket interface\n"
 	     "  -c      --cont           run continuously\n"
@@ -100,7 +100,7 @@ static void parse_opts(int argc, char *argv[])
 		static const struct option lopts[] = {
 			{ "device",  required_argument, 0, 'D' },
 			{ "file",    required_argument, 0, 'f' },
-			{ "grab",    no_argument,       0, 'g' },
+			{ "gui",     no_argument,       0, 'g' },
 			{ "help",    no_argument,       0, 'h' },
 			{ "i2c",     optional_argument, 0, 'i' },
 			{ "socket",  optional_argument, 0, 'k' },
@@ -133,7 +133,7 @@ static void parse_opts(int argc, char *argv[])
 				continuous = 1;
 				break;
 			case 'g':
-				grab = 1;
+				gui = 1;
 				break;
 			case 'i':
 				i2c = 1;
@@ -275,13 +275,15 @@ int main(int argc, char *argv[]) {
 		lfd = fopen(log_file, "w");
 	} else lfd = stdout;
 	
-	// GUI interface
+	if (gui) {
+		// GUI interface
 #ifdef GTK_GUI
-	// set up GUI
-	viewer_init(&argc, &argv);
+		// set up GUI
+		viewer_init(&argc, &argv);
 #else
-	printf("no GUI supported for current host OS configuration\n");
+		printf("no GUI supported for current host OS configuration\n");
 #endif //GTK_GUI
+	}
 
 	// CLI print out presentation
 	if (!continuous && (i2c || socket_client)) {
@@ -310,7 +312,7 @@ int main(int argc, char *argv[]) {
 				else printf("done\n");
 			}
 		}
-		if (grab) {
+		if (gui) {
 				linSen_data_t linSen_data;
 				uint16_t* frame;
 				int i,j;
@@ -337,10 +339,11 @@ int main(int argc, char *argv[]) {
 			}
 	} else {
 		/* build header */
-		if (bright) fprintf(lfd, "brightness\t");
-		if (pxclk) fprintf(lfd, "pixel clock\t");
-		if (exp) fprintf(lfd, "exposure\t");
-		if (g_result) fprintf(lfd, "global result\t");
+		fprintf(lfd, "id");
+		if (bright) fprintf(lfd, "\tbrightness");
+		if (pxclk) fprintf(lfd, "\tpixel clock");
+		if (exp) fprintf(lfd, "\texposure");
+		if (g_result) fprintf(lfd, "\tglobal result");
 		fprintf(lfd, "\n");
 	}
 
@@ -354,15 +357,15 @@ int main(int argc, char *argv[]) {
 
 			if (result < 0) {
 			} else if (last_id != linSen_data.result_id) {
-				printf("%d\t", linSen_data.result_id);
-				//~ fprintf(lfd, "%d\t", _id);
-				if (bright) fprintf(lfd, "%d\t", linSen_data.result_id);
-				if (pxclk) fprintf(lfd, "%d\t", linSen_data.pixel_clock);
-				if (exp) fprintf(lfd, "%d\t" , linSen_data.exposure);
-				if (g_result) fprintf(lfd, "%d\t", linSen_data.global_result);
+				//~ printf("%d", linSen_data.result_id);
+				fprintf(lfd, "%d\t", linSen_data.result_id);
+				if (bright) fprintf(lfd, "\t%d", linSen_data.brightness);
+				if (pxclk) fprintf(lfd, "\t%d", linSen_data.pixel_clock);
+				if (exp) fprintf(lfd, "\t%d" , linSen_data.exposure);
+				if (g_result) fprintf(lfd, "\t%d", linSen_data.global_result);
 				fprintf(lfd, "\n");
 				
-				if (grab) {
+				if (gui) {
 					uint16_t* frame;
 
 					frame = malloc(linSen_data.pixel_number_x * linSen_data.pixel_number_y * sizeof(uint16_t));
@@ -379,11 +382,10 @@ int main(int argc, char *argv[]) {
 					}
 				}
 				last_id = linSen_data.result_id;
-#ifdef GTK_GUI						
-				viewer_update();
-#endif //GTK_GUI
-
 			}
+#ifdef GTK_GUI
+			if (gui) viewer_update();
+#endif //GTK_GUI
 		}
 		
 		// socket
@@ -392,6 +394,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	
+	if (log_file != NULL) fclose(lfd);
+
 	printf("\nlinSen connect tool closed\n");
 
 	return linSen_close();

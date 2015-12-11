@@ -107,7 +107,6 @@ static void do_plot(cairo_t *cr, cairo_pattern_t *pattern, int index, double sca
 	// to calculate horizontal scale and zero-line
 	double scale_h = (max == min)? 1.0: (double)height / (max - min);
 	int neutral = max * scale_h;
-	printf("%d(%d,%d): scale_h: %f\tneutral: %d\n", index, min, max, scale_h, neutral);
 
 	cairo_set_source(cr, pattern);
 	cairo_set_line_width(cr,1);
