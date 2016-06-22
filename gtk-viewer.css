@@ -1,3 +1,7 @@
+GtkFrame > * {
+	margin: 6px;
+}
+
 GtkGrid > * {
 	padding: 6px;
 }

@@ -6,6 +6,7 @@ INLCUDES = -I.
 
 CFLAGS = -Wall
 #CFLAGS += -pedantic -O0 -std=c99
+#CFLAGS += -DDEBUG_VERBOSE
 DFLAGS =
 LDFLAGS =
 LDLIBS = 
