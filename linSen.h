@@ -60,7 +60,7 @@ typedef enum {
 	interface_SOCKET
 } linSen_interface_t;
 
-int linSen_init(const char* dev, linSen_interface_t);
+int linSen_init(const char* dev, int address, linSen_interface_t interface);
 int linSen_close(void);
 
 int linSen_set_exposure(int value);

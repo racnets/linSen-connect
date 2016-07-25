@@ -24,14 +24,14 @@ linSen_interface_t linSen_relay_interface = interface_NONE;
  * 
  * @return EXIT_SUCCESS, EXIT_SUCCESS
  */
-int linSen_init(const char* dev, linSen_interface_t interface) {
+int linSen_init(const char* dev, int address, linSen_interface_t interface) {
 	int result = EXIT_SUCCESS;
 
 	debug_printf("called");
 
 	if (interface == interface_I2C) {
 		linSen_access_interface = interface;
-		if (i2c_init(dev, LINSEN_I2C_SLAVE_ADDRESS) < 0) result = EXIT_FAILURE;
+		if (i2c_init(dev, address) < 0) result = EXIT_FAILURE;
 	} else if ((interface == interface_SOCKET) && (dev == NULL)) {
 		linSen_relay_interface = interface;
 		if (linSen_socket_server_init() < 0) result = EXIT_FAILURE;

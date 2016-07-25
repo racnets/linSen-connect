@@ -16,22 +16,25 @@
 
 GtkWidget* window;
 
-GtkAdjustment* exposure_adj;
-GtkAdjustment* pixel_clock_adj;
-GtkAdjustment* brightness_adj;
-GtkAdjustment* result_adj;
-GtkWidget* exposure_toggle;
-GtkWidget* pixel_clock_toggle;
-GtkWidget* brightness_toggle;
-GtkWidget* frame_label;    
-GtkWidget* size_label;    
-GtkWidget* local_result_number_label;
-GtkWidget* result_toggle;
-GtkWidget* status_bar_1;
-GtkWidget* status_bar_2;
-GtkWidget* status_bar_3;
-GtkWidget* quadPix_raw_check;
-GtkWidget* quadPix_result_check;
+GtkAdjustment *exposure_adj;
+GtkAdjustment *pixel_clock_adj;
+GtkAdjustment *brightness_adj;
+GtkAdjustment *result_adj;
+
+GtkWidget *exposure_toggle;
+GtkWidget *pixel_clock_toggle;
+GtkWidget *brightness_toggle;
+GtkWidget *result_toggle;
+GtkWidget *quadPix_raw_toggle;
+GtkWidget *quadPix_result_toggle;
+
+
+GtkWidget *status_bar_1;
+GtkWidget *status_bar_2;
+GtkWidget *status_bar_3;
+
+GtkWidget *quadPix_raw_check;
+GtkWidget *quadPix_result_check;
 
 linSen_data_t linSen_data;
 
@@ -46,7 +49,7 @@ cairo_surface_t *quadPix_result_image = NULL;
 int quadPix_result_request = FALSE;
 
 #define PLOTTER_BUFFER 256
-#define PLOTTER_ITEMS  4
+#define PLOTTER_ITEMS  12
 struct {
 	int value[PLOTTER_ITEMS][PLOTTER_BUFFER];
 	int write_pos;
@@ -172,10 +175,22 @@ static gboolean plotter_on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer u
 	cairo_set_source_rgb(cr, 255, 255, 255); 
 	cairo_paint(cr);
 
-	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(exposure_toggle))) do_plot(cr, cairo_pattern_create_rgb(1,0,0), 0, scale_w, height);
-	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(pixel_clock_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,1,0), 1, scale_w, height);
-	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brightness_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,0,1), 2, scale_w, height);
-	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(result_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,0,0), 3, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(exposure_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,0,0), 0, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(pixel_clock_toggle))) do_plot(cr, cairo_pattern_create_rgb(0.5,0.5,0.5), 1, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brightness_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,1,1), 2, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(result_toggle))) do_plot(cr, cairo_pattern_create_rgb(0,1,0), 3, scale_w, height);
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(quadPix_raw_toggle))) {
+		do_plot(cr, cairo_pattern_create_rgb(0,0,1), 4, scale_w, height);
+		do_plot(cr, cairo_pattern_create_rgb(0.5,0,1), 5, scale_w, height);
+		do_plot(cr, cairo_pattern_create_rgb(1,0,1), 6, scale_w, height);
+		do_plot(cr, cairo_pattern_create_rgb(1,0,0.5), 7, scale_w, height);
+	}
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(quadPix_result_toggle))) {
+		do_plot(cr, cairo_pattern_create_rgb(1,0,0), 8, scale_w, height);
+		do_plot(cr, cairo_pattern_create_rgb(1,0.5,0), 9, scale_w, height);
+		do_plot(cr, cairo_pattern_create_rgb(1,1,0), 10, scale_w, height);
+		do_plot(cr, cairo_pattern_create_rgb(0.5,1,0), 10, scale_w, height);
+	}
 
 	return TRUE;
 }
@@ -292,21 +307,29 @@ int viewer_init(int *argc, char **argv[]) {
 	quadPix_result_check = GTK_WIDGET(tmp_obj);
 	
 	/* get exposure toggle-button */
-	tmp_obj = gtk_builder_get_object(builder, "exp_toggle-button");
+	tmp_obj = gtk_builder_get_object(builder, "exp_toggle");
 	exposure_toggle = GTK_WIDGET(tmp_obj);
 
 	/* get pixel clock toggle-button */
-	tmp_obj = gtk_builder_get_object(builder, "pix-clk_toggle-button");
+	tmp_obj = gtk_builder_get_object(builder, "pix-clk_toggle");
 	pixel_clock_toggle = GTK_WIDGET(tmp_obj);
 
 	/* get brightness toggle-button */
-	tmp_obj = gtk_builder_get_object(builder, "bright_toggle-button");
+	tmp_obj = gtk_builder_get_object(builder, "bright_toggle");
 	brightness_toggle = GTK_WIDGET(tmp_obj);
 
 	/* get result toggle-button */
-	tmp_obj = gtk_builder_get_object(builder, "result_toggle-button");
+	tmp_obj = gtk_builder_get_object(builder, "result_toggle");
 	result_toggle = GTK_WIDGET(tmp_obj);
 
+	/* get quadPix raw toggle-button */
+	tmp_obj = gtk_builder_get_object(builder, "quadPix-raw_toggle");
+	quadPix_raw_toggle = GTK_WIDGET(tmp_obj);
+	
+	/* get quadPix result toggle-button */
+	tmp_obj = gtk_builder_get_object(builder, "quadPix-result_toggle");
+	quadPix_result_toggle = GTK_WIDGET(tmp_obj);
+	
 	/* plotter drawing area */
 	tmp_obj = gtk_builder_get_object(builder, "plotter_draw-area");
 	g_signal_connect(tmp_obj, "draw", G_CALLBACK(plotter_on_draw_event), NULL); 	
@@ -349,13 +372,15 @@ int viewer_update() {
 /*
  * set up an grey-scale image from 12bit data
  * 
+ * negative data will be displayed in red-scale
+ * 
  * @param **image
  * @param *data
  * @param width
  * @param height 
  * @return EXIT_SUCCESS, EXIT_FAILURE
  */
-int viewer_create_image_from_data(cairo_surface_t **image, const uint16_t *data, int width, int height) {
+int viewer_create_image_from_data(cairo_surface_t **image, const int16_t *data, int width, int height) {
 	debug_printf("called with *image: %#x\t*data: %#x\twidth: %d\theight: %d", (int)image, (int)data, width, height);
 
 	/* if no data is assigned */
@@ -374,10 +399,15 @@ int viewer_create_image_from_data(cairo_surface_t **image, const uint16_t *data,
 	frame = malloc(height*stride); 
 	int i;
 	for(i=0;i<(height*width);i++) {
-		/* truncate to 16bit to 12bit and reduce to 10bit */
-		uint16_t p =(data[i] & 0x0FFF) >> 2;
-		/* convert 10bit grey to RGB30-grey */
-		frame[i] = (p << 20) | (p << 10) | p;
+		/* convert & truncate 16bit signed to 12bit unsigned and reduce to 10bit */
+		uint16_t p =(abs(data[i]) & 0x0FFF) >> 2;
+		if (data[i] >= 0) {
+			/* convert 10bit grey to RGB30-grey */
+			frame[i] = (p << 20) | (p << 10) | p;
+		} else {
+			/* convert 10bit red to RGB30-red */
+			frame[i] = (p << 20) | (0 << 10) | 0;
+		}
 		verbose_printf("%d %d %d\t%d: %x %x\n", width, height, stride, data[i], p, frame[i]);
 	}		
 	
@@ -403,7 +433,7 @@ int viewer_set_quadPix_raw(const uint32_t *data, int width, int height) {
 	int i;
 	double scale;
 
-	/* scale */
+	/* scale to 12bit */
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(quadPix_raw_check))) {
 		int _max = 1;
 		
@@ -422,7 +452,7 @@ int viewer_set_quadPix_raw(const uint32_t *data, int width, int height) {
 	}
 
 
-	uint16_t *_data = malloc(_datasize);
+	int16_t *_data = malloc(_datasize);
 	for (i=0;i<_datasize;i++) {
 		_data[i] = data[i] * scale;
 	}
@@ -436,6 +466,13 @@ int viewer_set_quadPix_raw(const uint32_t *data, int width, int height) {
 	/* create image using helper function */
 	viewer_create_image_from_data(&quadPix_raw_image, _data, width, height);
 
+	/* fill plot data - write position is updated with each linSen data write */
+	//if (++plot_data.write_pos >= PLOTTER_BUFFER) plot_data.write_pos = 0;	
+	plot_data.value[4][plot_data.write_pos] = _data[0];
+	plot_data.value[5][plot_data.write_pos] = _data[1];
+	plot_data.value[6][plot_data.write_pos] = _data[2];
+	plot_data.value[7][plot_data.write_pos] = _data[3];
+	
 	/* reset request flag */
 	quadPix_raw_request = FALSE;
 
@@ -463,36 +500,47 @@ int viewer_set_quadPix_result(const int32_t *data, int width, int height) {
 	if (data == NULL) return EXIT_FAILURE;
 
 	int _datasize = width*height;
-	uint16_t *_data = malloc(_datasize);
-	int i;
+	int16_t *_data = malloc(_datasize);
 	double scale;
 
-	/* scale */
+	/* scale or truncate */
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(quadPix_result_check))) {
+		/* scale to 12 bit */
 		int _max = 1;
-		
+		int i;
 		for (i=0;i<_datasize;i++) {
-			if (data[i] > _max) _max = data[i];
+			if (abs(data[i]) > _max) _max = data[i];
 		}
-		
 		scale = 4096 / _max;
+
+		for (i=0;i<_datasize;i++) {
+			_data[i] = data[i] * scale;
+		}
 
 		char _str[sizeof("gain()") + strlen(DEFTOSTRING(INT_MAX))];
 		sprintf(_str, "gain(%d)", (int)scale);
 		gtk_button_set_label(GTK_BUTTON(quadPix_result_check), _str);
 	} else {
-		scale = 1;
+		/* truncate to 16-bit signed */
+		int i;
+		for (i=0;i<_datasize;i++) {
+			if (data[i] > SHRT_MAX) _data[i] = SHRT_MAX;
+			else if (data[i] < SHRT_MIN) _data[i] = SHRT_MIN;
+			else _data[i] = data[i];
+		}
 		gtk_button_set_label(GTK_BUTTON(quadPix_result_check), "gain");
 	}
-
-	for (i=0;i<_datasize;i++) {
-		_data[i] = data[i] * scale;
-	}
-
 	
 	/* create image using helper function */
 	viewer_create_image_from_data(&quadPix_result_image, _data, width, height);
 	
+	/* fill plot data - write position is updated with each linSen data write */
+	//if (++plot_data.write_pos >= PLOTTER_BUFFER) plot_data.write_pos = 0;
+	plot_data.value[8][plot_data.write_pos] = _data[0];
+	plot_data.value[9][plot_data.write_pos] = _data[1];
+	plot_data.value[10][plot_data.write_pos] = _data[2];
+	plot_data.value[11][plot_data.write_pos] = _data[3];
+
 	/* reset request flag */
 	quadPix_result_request = FALSE;
 			
@@ -520,8 +568,8 @@ int viewer_set_linSen_raw(const uint16_t *img, int width, int height) {
 	if (img == NULL) return EXIT_FAILURE;
 	
 	/* create image using helper function */
-	viewer_create_image_from_data(&linSen_raw_image, img, width, height);
-	
+	viewer_create_image_from_data(&linSen_raw_image, (int16_t *)img, width, height);
+
 	/* reset request flag */
 	linSen_raw_request = FALSE;
 			
@@ -561,7 +609,12 @@ int viewer_set_linSen_data(linSen_data_t *data) {
 	gtk_adjustment_set_value(brightness_adj, linSen_data.brightness);
 
 	/* set result slider value */
-	gtk_adjustment_configure(result_adj, linSen_data.global_result, -linSen_data.pixel_number_x/2, +linSen_data.pixel_number_x/2, 1, 0, 0);
+	static int is_not_fixed_point_value = 33;
+	if (is_not_fixed_point_value) {
+		if ((linSen_data.global_result > linSen_data.pixel_number_x/2) || (linSen_data.global_result < linSen_data.pixel_number_x/2)) is_not_fixed_point_value--;
+		gtk_adjustment_configure(result_adj, linSen_data.global_result, -linSen_data.pixel_number_x/2, +linSen_data.pixel_number_x/2, 1, 0, 0);
+	} else gtk_adjustment_configure(result_adj, ((double) linSen_data.global_result)/1024, -linSen_data.pixel_number_x/2, +linSen_data.pixel_number_x/2, 1, 0, 0);
+
 
 	/* status bar */
 	/* frame number*/
@@ -586,6 +639,9 @@ int viewer_set_linSen_data(linSen_data_t *data) {
 	plot_data.value[1][plot_data.write_pos] = linSen_data.pixel_clock;
 	plot_data.value[2][plot_data.write_pos] = linSen_data.brightness;
 	plot_data.value[3][plot_data.write_pos] = linSen_data.global_result;
+	
+	/* force redraw */
+	gtk_widget_queue_draw(window);
 	
 	return EXIT_SUCCESS;
 }

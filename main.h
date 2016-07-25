@@ -1,7 +1,7 @@
 /*
  * main.h
  *
- * Author: retsnac
+ * Author: racnets
  */
 
 #ifndef MAIN_H_

@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <unistd.h>		//close, sleep
 #include <stdio.h>		//fprintf, printf
-#include <stdlib.h>		//atoi, atof
+#include <stdlib.h>		//atoi, atof, strtol
 #include <string.h>		//strcmp, strerror
 #include <getopt.h>		//getoptlong
 #include <sys/time.h>	//gettimeofday
@@ -59,6 +59,7 @@ struct {
 	/* interfaces */
 	/* i2c */
 	param_type i2c;
+	param_type i2c_addr;
 	/* commands */
 	/* read */
 	param_type val_read;
@@ -66,7 +67,8 @@ struct {
 	param_type val_write;
 } prog_param = {
 	.i2c.dev = "/dev/i2c-0",
-	.mark.value = 100
+	.mark.value = 100,
+	.i2c_addr.value = LINSEN_I2C_SLAVE_ADDRESS
 };
 
 
@@ -103,12 +105,13 @@ static void print_usage(const char *prog)
 	     "  -f arg  --file=arg       log file to write to\n"
 	     "  -g      --gui            show GUI\n"
 	     "  -i[dev] --i2c[=dev]      use i2c interface - default /dev/i2c-0\n"
-	     "  -k[arg]  --socket        provides socket server interface if arg is empty, otherwise use socket interface\n"
-	     "  -c      --cont           run continuously\n"
-	     "  -t arg  --time=arg       run specified time in seconds\n"
+	     "  -a addr --addr=addr      i2c slave address - if not set, default is used\n"
+	     "  -k[arg] --socket         provides socket server interface if arg is empty, otherwise use socket interface\n"
+	     "  -c[arg] --cont[=arg]     run continuously for given time \n"
 	     "  -v      --verbose        be verbose\n"
 	     "  -r      --read           reads value(s)\n"
 	     "  -w      --write          writes value(s)\n"
+	     "  -m      --mark           i2c benchmark\n"
 	     " linSen related\n"
 	     "  -E[arg] --exp[=arg]      exposure\n"
 	     "  -P[arg] --pxclk[=arg]    pixel clock\n"
@@ -131,14 +134,13 @@ static void parse_opts(int argc, char *argv[])
 
 	while (1) {
 		static const struct option lopts[] = {
-			{ "device",  required_argument, 0, 'D' },
 			{ "file",    required_argument, 0, 'f' },
 			{ "gui",     no_argument,       0, 'g' },
 			{ "help",    no_argument,       0, 'h' },
 			{ "i2c",     optional_argument, 0, 'i' },
+			{ "addr",    required_argument, 0, 'a' },
 			{ "socket",  optional_argument, 0, 'k' },
-			{ "cont",    no_argument,       0, 'c' },
-			{ "time",    required_argument, 0, 't' },
+			{ "cont",    optional_argument, 0, 'c' },
 			{ "verbose", no_argument,       0, 'v' },
 			{ "read",    no_argument,       0, 'r' },
 			{ "write",   no_argument,       0, 'w' },
@@ -161,7 +163,7 @@ static void parse_opts(int argc, char *argv[])
 		 * ::	optional argument
 		 * 		no_argument
 		*/
-		c = getopt_long(argc, argv, "D:f:i::k::t:B::E::m::P::AcFghQrvwRX", lopts, NULL);
+		c = getopt_long(argc, argv, "a:c::f:i::k::B::E::m::P::AFghQrvwRX", lopts, NULL);
 
 		if (c == -1)
 			break;
@@ -169,6 +171,7 @@ static void parse_opts(int argc, char *argv[])
 		switch (c) {
 			case 'c':
 				set_flag(&prog_param.continuous);
+				if (optarg) time = atof(optarg);
 				break;
 			case 'g':
 				set_flag(&prog_param.gui);
@@ -176,6 +179,10 @@ static void parse_opts(int argc, char *argv[])
 			case 'i':
 				set_flag(&prog_param.i2c);
 				if (optarg) prog_param.i2c.dev = optarg;
+				break;
+			case 'a':
+				set_flag(&prog_param.i2c_addr);
+				prog_param.i2c_addr.value = strtoul(optarg, NULL, 16);
 				break;
 			case 'r':
 				set_flag(&prog_param.val_read);
@@ -216,10 +223,6 @@ static void parse_opts(int argc, char *argv[])
 				break;
 			case 'v':
 				set_flag(&prog_param.verbose);
-				break;
-			case 't':
-				time = atof(optarg);
-				set_flag(&prog_param.continuous);
 				break;
 			case 'k':
 				if (optarg) {
@@ -271,37 +274,39 @@ int main(int argc, char *argv[]) {
 		return EXIT_SUCCESS;
 	}
 
-	// set up signal handler
+	/* set up signal handler */
 	if (signal(SIGINT, sig_handler) == SIG_ERR) printf("can't catch SIGINT\n");
 
-	// optional argument parser
+	/* optional argument parser */
 	parse_opts(argc, argv);
 	
-	// check, if not more than one client interface was declared 
+	/* check, if not more than one client interface was declared */
 	if (is_set(prog_param.i2c) && is_set(prog_param.socket_client)) {
 		printf("can't use i2c and client socket interface simultaneously! Set socket to server functionality, instead!\n");
 		clear_flag(&prog_param.socket_client);
 		set_flag(&prog_param.socket_server);
 	}
 
-	// i2c interface
+	/* i2c interface */
 	if (is_set(prog_param.i2c)) {
-		// setup & initalize i2c
+		/* setup & initalize i2c */
 		printf("setup i2c via: %s", prog_param.i2c.dev);
+		printf(" @ address: %d (%#x)", prog_param.i2c_addr.value, prog_param.i2c_addr.value);
 
-		result = linSen_init(prog_param.i2c.dev, interface_I2C);
+		result = linSen_init(prog_param.i2c.dev, prog_param.i2c_addr.value, interface_I2C);
 		if (result < 0) {
 			printf(" ...failed with error %d: %s\n", errno, strerror(errno));
 			clear_flag(&prog_param.i2c);
-		} else printf(" ...finished: %d\n", result);
+		}
+		else printf(" ...finished\n");
 	}
 	
-	// socket client interface
+	/* socket client interface */
 	if (is_set(prog_param.socket_client)) {
 		// setup & initalize socket as client
 		printf("setup socket as client via: %s", prog_param.socket_client.server_address);
 
-		result = linSen_init(prog_param.socket_client.server_address, interface_SOCKET);
+		result = linSen_init(prog_param.socket_client.server_address, 0, interface_SOCKET);
 		if (result == EXIT_FAILURE) {
 			printf(" ...failed with error %d: %s\n", errno, strerror(errno));
 			clear_flag(&prog_param.socket_client);
@@ -318,12 +323,12 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	
-	// socket server interface
+	/* socket server interface */
 	if (is_set(prog_param.socket_server)) {
 		// setup & initalize socket as server
 		printf("setup socket as server");
 
-		result = linSen_init(NULL, interface_SOCKET);
+		result = linSen_init(NULL, 0, interface_SOCKET);
 		if (result < 0) {
 			printf(" ...failed with error %d: %s\n", errno, strerror(errno));
 			clear_flag(&prog_param.socket_server);
@@ -331,88 +336,88 @@ int main(int argc, char *argv[]) {
 		else printf(" ...finished\n");
 	}
 	
-	// benchmark
-	if (is_set(prog_param.mark)) {
-		if (is_set(prog_param.i2c)) {
-			double t1, t2, t;
-			int result, i;
-			printf("benchmark i2c connection - %d reads each\n", prog_param.mark.value);
-			printf("\tbyte read:");
-			{
-				uint8_t value;
-				t = 0;
-				i = prog_param.mark.value;
-				while (i) {
-					t1 = getTime();
-					result = i2c_read_b(0x00, &value);
-					t2 = getTime();
-					if (result == 1) {
-						t +=  t2-t1;
-						i--;
-					}
+	/* benchmark i2c */
+	if (is_set(prog_param.mark) && (is_set(prog_param.i2c))) {
+		double t1, t2, t;
+		int result, i;
+		printf("benchmark i2c connection - %d reads each\n", prog_param.mark.value);
+		printf("\tbyte read:");
+		{
+			uint8_t value;
+			t = 0;
+			i = prog_param.mark.value;
+			while (i) {
+				t1 = getTime();
+				result = i2c_read_b(0x00, &value);
+				t2 = getTime();
+				if (result == 1) {
+					t +=  t2-t1;
+					i--;
 				}
-				printf("\t %f\n", prog_param.mark.value/t);
 			}
-			printf("\tword read:");
-			{
-				uint16_t value;
-				t = 0;
-				i = prog_param.mark.value;
-				while (i) {
-					t1 = getTime();
-					result = i2c_read_w(0x00, &value);
-					t2 = getTime();
-					if (result == 2) {
-						t +=  t2-t1;
-						i--;
-					}
+			printf("\t %f\n", prog_param.mark.value/t);
+		}
+		printf("\tword read:");
+		{
+			uint16_t value;
+			t = 0;
+			i = prog_param.mark.value;
+			while (i) {
+				t1 = getTime();
+				result = i2c_read_w(0x00, &value);
+				t2 = getTime();
+				if (result == 2) {
+					t +=  t2-t1;
+					i--;
 				}
-				printf("\t %f\n", prog_param.mark.value/t);
 			}
-			printf("\tlong read:");
-			{
-				uint32_t value;
-				t = 0;
-				i = prog_param.mark.value;
-				while (i) {
-					t1 = getTime();
-					result = i2c_read_l(0x00, &value);
-					t2 = getTime();
-					if (result == 4) {
-						t +=  t2-t1;
-						i--;
-					}
+			printf("\t %f\n", prog_param.mark.value/t);
+		}
+		printf("\tlong read:");
+		{
+			uint32_t value;
+			t = 0;
+			i = prog_param.mark.value;
+			while (i) {
+				t1 = getTime();
+				result = i2c_read_l(0x00, &value);
+				t2 = getTime();
+				if (result == 4) {
+					t +=  t2-t1;
+					i--;
 				}
-				printf("\t %f\n", prog_param.mark.value/t);
 			}
-			printf("\tblock read 32 bytes:");
-			{
-				uint16_t value[16];
-				t = 0;
-				i = prog_param.mark.value;
-				while (i) {
-					t1 = getTime();
-					result = i2c_read_n_w(0x00, value, 16);
-					t2 = getTime();
-					if (result) {
-						t +=  t2-t1;
-						i--;
-					}
+			printf("\t %f\n", prog_param.mark.value/t);
+		}
+		printf("\tblock read 32 bytes:");
+		{
+			uint16_t value[16];
+			t = 0;
+			i = prog_param.mark.value;
+			while (i) {
+				t1 = getTime();
+				result = i2c_read_n_w(0x00, value, 16);
+				t2 = getTime();
+				if (result) {
+					t +=  t2-t1;
+					i--;
 				}
-				printf("\t %f\n", prog_param.mark.value/t);
 			}
+			printf("\t %f\n", prog_param.mark.value/t);
 		}
 		return EXIT_SUCCESS;
 	}
 	
+	/* prepare log file */
 	if (is_set(prog_param.log)) {
 		lfd = fopen(prog_param.log.file, "w");
 	} else lfd = stdout;
 	
+	/* prepare GUI */
 	if (is_set(prog_param.gui)) {
-		// GUI interface
+		/* GUI interface */
 #ifdef GTK_GUI
-		// set up GUI
+		/* set up GUI */
 		viewer_init(&argc, &argv);
 #else
 		printf("no GUI supported for current host OS configuration\n");
@@ -420,9 +425,9 @@ int main(int argc, char *argv[]) {
 #endif //GTK_GUI
 	}
 	
+	/* prepare header for logging or continuos CLI operation */
 	if (is_set(prog_param.continuous)) {
-		// prepare header
-		fprintf(lfd, "id");
+		fprintf(lfd, "date\tid");
 		if (is_set(linSen_param.brightness)) fprintf(lfd, "\tbright");
 		if (is_set(linSen_param.pixel_clock)) fprintf(lfd, "\tpxclk");
 		if (is_set(linSen_param.exposure)) fprintf(lfd, "\texp");
@@ -430,94 +435,108 @@ int main(int argc, char *argv[]) {
 		if (is_set(quad_param.average)) fprintf(lfd, "\tq_average");
 		if (is_set(quad_param.filtered)) fprintf(lfd, "\tq_filt_0 \tq_filt_1 \tq_filt_2 \tq_filt_3");
 		if (is_set(quad_param.raw)) fprintf(lfd, "\tq_raw_0 \tq_raw_1 \tq_raw_2 \tq_raw_3");
+		fprintf(lfd, "\n");
 	}
 
+	/* set end-time for contious operation */
 	if (time) {
 		time += getTime();
 	}
 
-	if (is_set(prog_param.gui) || is_set(prog_param.continuous) || is_set(prog_param.socket_server)) {
-		while (is_set(prog_param.gui) || is_set(prog_param.continuous) || is_set(prog_param.socket_server)) {
-			if (is_set(prog_param.i2c) || is_set(prog_param.socket_client)) {
-				// socket server functionality 
-				if (is_set(prog_param.socket_server)) {
-					if (linSen_process() < 0) break;
+	/* contious or gui operation */
+	while (is_set(prog_param.gui) || is_set(prog_param.continuous) || is_set(prog_param.socket_server)) {
+		if (is_set(prog_param.i2c) || is_set(prog_param.socket_client)) {
+			/* socket server functionality */
+			if (is_set(prog_param.socket_server)) {
+				if (linSen_process() < 0) break;
+			}
+			
+			/* acquire data for GUI or continous CLI mode */
+			if (is_set(prog_param.gui) || is_set(prog_param.continuous)) {
+				linSen_data_t linSen_data;
+				__attribute__((__unused__)) static int last_id = -1;
+
+				result = linSen_get_data(&linSen_data);
+				if (result < 0) {
 				}
-				// acquire data for GUI or continous CLI mode
-				if (is_set(prog_param.gui) || is_set(prog_param.continuous)) {
-					linSen_data_t linSen_data;
-					static int last_id = -1;
+				
+				if (is_set(prog_param.continuous)) {
+					/* contious operation - logging */
+					fprintf(lfd, "%f\t%d\t", getTime(), linSen_data.result_id);
+					if (is_set(linSen_param.brightness)) fprintf(lfd, "\t%d", linSen_data.brightness);
+					if (is_set(linSen_param.pixel_clock)) fprintf(lfd, "\t%d", linSen_data.pixel_clock);
+					if (is_set(linSen_param.exposure)) fprintf(lfd, "\t%d" , linSen_data.exposure);
+					if (is_set(linSen_param.global_result)) fprintf(lfd, "\t%d", linSen_data.global_result);					
+					if (is_set(quad_param.raw)) {
+						uint32_t frame[4];
+						int i;
 
-					result = linSen_get_data(&linSen_data);
-
-					if (result < 0) {
-					} else if (last_id != linSen_data.result_id) {
-						debug_printf("result_id: %d", linSen_data.result_id);
-						if (is_set(prog_param.continuous)) {
-							fprintf(lfd, "%d\t", linSen_data.result_id);
-							if (is_set(linSen_param.brightness)) fprintf(lfd, "\t%d", linSen_data.brightness);
-							if (is_set(linSen_param.pixel_clock)) fprintf(lfd, "\t%d", linSen_data.pixel_clock);
-							if (is_set(linSen_param.exposure)) fprintf(lfd, "\t%d" , linSen_data.exposure);
-							if (is_set(linSen_param.global_result)) fprintf(lfd, "\t%d", linSen_data.global_result);
-							if (is_set(quad_param.raw)) {
-								uint32_t frame[4];
-								int i;
-
-								result = linSen_qp_get_raw(frame, 4);
-								if (result) {
-									for (i=0;i<4;i++) {
-										fprintf(lfd, "\t%d", frame[i]);
-									}
-								}
+						result = linSen_qp_get_raw(frame, 4);
+						if (result) {
+							for (i=0;i<4;i++) {
+								fprintf(lfd, "\t%d", frame[i]);
 							}
-							fprintf(lfd, "\n");
 						}
+					}
+					if (is_set(quad_param.filtered)) {
+						uint32_t frame[4];
+						int i;
+
+						result = linSen_qp_get_filt(frame, 4);
+						if (result) {
+							for (i=0;i<4;i++) {
+								fprintf(lfd, "\t%d", frame[i]);
+							}
+						}
+					}
+					if (is_set(quad_param.average)) fprintf(lfd, "\t%d", linSen_qp_get_avg());
+					fprintf(lfd, "\n");
+				}
 #ifdef GTK_GUI			
-						if (is_set(prog_param.gui)) {
-							/* sent to linSen data to GUI */
-							viewer_set_linSen_data(&linSen_data);
+				if (is_set(prog_param.gui) && (last_id != linSen_data.result_id)) {
+					/* sent to linSen data to GUI */
+					viewer_set_linSen_data(&linSen_data);
 							
-							/* sent linSen raw data to GUI, if requested */
-							if (viewer_want_linSen_raw()) {
-								uint16_t* frame;
+					/* sent linSen raw data to GUI, if requested */
+					if (viewer_want_linSen_raw()) {
+						uint16_t* frame;
 
-								frame = malloc(linSen_data.pixel_number_x * linSen_data.pixel_number_y * sizeof(uint16_t));
-								result = linSen_get_raw(frame, linSen_data.pixel_number_x * linSen_data.pixel_number_y);
-						
-								if (result) {									
-									if (viewer_set_linSen_raw(frame, linSen_data.pixel_number_x, linSen_data.pixel_number_y) == EXIT_FAILURE) {
-									// exit
-									break;
-									}								
-								}
-							}
-							
-							/* sent linSen quadPix data to GUI, if requested */
-							if (viewer_want_quadPix_raw()) {
-								uint32_t frame[4];
-
-								result = linSen_qp_get_raw(frame, 4);
-								
-								viewer_set_quadPix_raw(frame, 2, 2);
-							}
-
-							/* sent linSen quadPix result to GUI, if requested */
-							if (viewer_want_quadPix_result()) {
-								uint32_t frame[4];
-
-								result = linSen_qp_get_filt(frame, 4);
-								
-								viewer_set_quadPix_result((int32_t)frame, 2, 2);
-							}
+						frame = malloc(linSen_data.pixel_number_x * linSen_data.pixel_number_y * sizeof(uint16_t));
+						result = linSen_get_raw(frame, linSen_data.pixel_number_x * linSen_data.pixel_number_y);
+					
+						if (result) {									
+							if (viewer_set_linSen_raw(frame, linSen_data.pixel_number_x, linSen_data.pixel_number_y) == EXIT_FAILURE) {
+								// exit
+								break;
+							}								
 						}
+					}
+							
+					/* sent linSen quadPix data to GUI, if requested */
+					if (viewer_want_quadPix_raw()) {
+						uint32_t frame[4];
+
+						result = linSen_qp_get_raw(frame, 4);
+						
+						viewer_set_quadPix_raw(frame, 2, 2);
+					}
+
+					/* sent linSen quadPix result to GUI, if requested */
+					if (viewer_want_quadPix_result()) {
+						uint32_t frame[4];
+
+						result = linSen_qp_get_filt(frame, 4);
+								
+						viewer_set_quadPix_result((int32_t *)frame, 2, 2);
+					}
+				}
 #endif //GTK_GUI
-						last_id = linSen_data.result_id;
-					}
-					if (time && (time < getTime())) {
-						// stop after defined time - if given
-						clear_flag(&prog_param.continuous);
-						clear_flag(&prog_param.gui);
-					}
+				last_id = linSen_data.result_id;
+
+				if (time && (time < getTime())) {
+					// stop after defined time - if given
+					clear_flag(&prog_param.continuous);
+					clear_flag(&prog_param.gui);
 				}
 			}
 #ifdef GTK_GUI
@@ -529,8 +548,9 @@ int main(int argc, char *argv[]) {
 			}
 #endif //GTK_GUI
 		}
-	} else {
-		// intermittent CLI print out presentation
+	} // while
+	if (!is_set(prog_param.gui) && !is_set(prog_param.continuous) && !is_set(prog_param.socket_server)) {	
+		/* intermittent CLI print out presentation */
 		if (is_set(prog_param.i2c) || is_set(prog_param.socket_client)) {
 			if (is_set(prog_param.val_read)) {
 				if (is_set(linSen_param.brightness)) printf("brightness: %d\n", linSen_get_brightness());
