@@ -115,6 +115,7 @@ int linSen_set_exposure(int value) {
 	return result;
 }
 
+
 /*
  * linSen get brightness 
  * 
@@ -528,6 +529,37 @@ int linSen_servo_get_pos(int chan){
 		case interface_SOCKET: {
 			int _value;
 			if (linSen_socket_read(LINSEN_SERVO_0_POS_READ_STRING, &_value, sizeof(uint16_t)) == EXIT_SUCCESS) result = _value;
+			break;
+		}
+		default:;
+	}
+	
+	debug_printf("returns: %d", result);		
+	return result;
+}
+
+/*
+ * linSen servo set position value
+ * 
+ * @param chan: servo channel
+ * @param pos:  servo position
+ * @return non-negative position(success), -1 (failure)
+ */
+int linSen_servo_set_pos(int chan, unsigned int pos){
+	int result = -1;
+
+	debug_printf("called");
+	
+	if (chan < 0) return result;
+	if (chan >= LINSEN_SERVO_NUMBER) return result;
+	
+	switch (linSen_access_interface) {
+		case interface_I2C: {
+			result = i2c_write_w(LINSEN_SERVO_0_POS_ADDR, (uint16_t)pos);
+			break;
+		}
+		case interface_SOCKET: {
+			result = linSen_socket_write_int(LINSEN_SERVO_0_POS_WRITE_STRING, pos);
 			break;
 		}
 		default:;

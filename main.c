@@ -26,11 +26,12 @@
 
 typedef enum {
 	FLAG_CLEARED = 0,
-	FLAG_SET = 1,
+	FLAG_SET = 1
 } flag_type;
 
 typedef struct {
-	flag_type flag;
+	flag_type set;
+	flag_type get;
 	union {
 		int value;
 		char *dev;
@@ -62,9 +63,9 @@ struct {
 	param_type continuous;
 	param_type verbose;
 	param_type gui;
-    param_type log;
-    param_type mark;
-    /* socket */
+	param_type log;
+	param_type mark;
+	/* socket */
 	param_type socket_client;
 	param_type socket_server;
 	/* interfaces */
@@ -92,16 +93,27 @@ double getTime() {
 	return tp.tv_sec + tp.tv_usec/1E6;
 }
 
-void set_flag(param_type *param) {
-	param->flag = FLAG_SET;
+void set_set(param_type *param) {
+	param->set = FLAG_SET;
 }
 
-void clear_flag(param_type *param) {
-	param->flag = FLAG_CLEARED;
+void clear_set(param_type *param) {
+	param->set = FLAG_CLEARED;
 }
 
 int is_set(param_type param) {
-	return (param.flag == FLAG_SET);
+	return (param.set == FLAG_SET);
+}
+void set_get(param_type *param) {
+	param->get = FLAG_SET;
+}
+
+void clear_get(param_type *param) {
+	param->get = FLAG_CLEARED;
+}
+
+int is_get(param_type param) {
+	return (param.get == FLAG_SET);
 }
 
 int verbose() {
@@ -111,18 +123,16 @@ int verbose() {
 /* print usage */
 static void print_usage(const char *prog)
 {
-	printf("\nUsage: %s [-cvX][-BEiP[arg]][-fkt arg]\n", prog);
+	printf("\nUsage: %s [-fgiakcvmEPBFRQAXp]\n", prog);
 	puts(" general\n"
 	     "  -f arg  --file=arg       log file to write to\n"
 	     "  -g      --gui            show GUI\n"
 	     "  -i[dev] --i2c[=dev]      use i2c interface - default /dev/i2c-0\n"
-	     "  -a addr --addr=addr      i2c slave address - if not set, default is used\n"
-	     "  -k[arg] --socket         provides socket server interface if arg is empty, otherwise use socket interface\n"
-	     "  -c[arg] --cont[=arg]     run continuously for given time \n"
+	     "  -a addr --addr[=]addr    i2c slave address - if not set, default is used\n"
+	     "  -k[arg] --socket         provides socket server interface if arg is not set, otherwise use socket interface\n"
+	     "  -c[arg] --cont[=arg]     run continuously for given time if arg is set, otherwise endless\n"
 	     "  -v      --verbose        be verbose\n"
-	     "  -r      --read           reads value(s)\n"
-	     "  -w      --write          writes value(s)\n"
-	     "  -m      --mark           i2c benchmark\n"
+	     "  -m[arg] --mark[=arg]     i2c benchmark - optional count of consecutive read and writes\n"
 	     " linSen related\n"
 	     "  -E[arg] --exp[=arg]      get or set exposure\n"
 	     "  -P[arg] --pxclk[=arg]    get or set pixel clock\n"
@@ -155,8 +165,6 @@ static void parse_opts(int argc, char *argv[])
 			{ "socket",  optional_argument, 0, 'k' },
 			{ "cont",    optional_argument, 0, 'c' },
 			{ "verbose", no_argument,       0, 'v' },
-			{ "read",    no_argument,       0, 'r' },
-			{ "write",   no_argument,       0, 'w' },
 			{ "mark",    optional_argument, 0, 'm' },			
 			{ "exp",     optional_argument, 0, 'E' },
 			{ "pxclk",   optional_argument, 0, 'P' },
@@ -177,80 +185,92 @@ static void parse_opts(int argc, char *argv[])
 		 * ::	optional argument
 		 * 		no_argument
 		*/
-		c = getopt_long(argc, argv, "a:c::f:i::k::B::E::m::p::P::AFghQrvwRX", lopts, NULL);
+		c = getopt_long(argc, argv, "a:c::f:i::k::B::E::m::p::P::AFghQvRX", lopts, NULL);
 
 		if (c == -1)
 			break;
 
 		switch (c) {
 			case 'c':
-				set_flag(&prog_param.continuous);
+				set_set(&prog_param.continuous);
 				if (optarg) time = atof(optarg);
 				break;
 			case 'g':
-				set_flag(&prog_param.gui);
+				set_set(&prog_param.gui);
 				break;
 			case 'i':
-				set_flag(&prog_param.i2c);
+				set_set(&prog_param.i2c);
 				if (optarg) prog_param.i2c.dev = optarg;
 				break;
 			case 'a':
-				set_flag(&prog_param.i2c_addr);
+				set_set(&prog_param.i2c_addr);
 				prog_param.i2c_addr.value = strtoul(optarg, NULL, 16);
 				break;
-			case 'r':
-				set_flag(&prog_param.val_read);
-				break;
-			case 'w':
-				set_flag(&prog_param.val_write);
-				break;
 			case 'm':
-				set_flag(&prog_param.mark);
+				set_get(&prog_param.mark);
 				if (optarg) prog_param.mark.value = atoi(optarg);
 				break;
 			case 'B':
-				set_flag(&linSen_param.brightness);
-				if (optarg) linSen_param.brightness.value = atoi(optarg);
+				if (optarg) {
+					linSen_param.brightness.value = atoi(optarg);
+					set_set(&linSen_param.brightness);
+				} else {
+					set_get(&linSen_param.brightness);
+				}
 				break;
 			case 'E':
-				set_flag(&linSen_param.exposure);
-				if (optarg) linSen_param.exposure.value = atoi(optarg);
+				if (optarg) {
+					linSen_param.exposure.value = atoi(optarg);
+					set_set(&linSen_param.exposure);
+				} else {
+					set_get(&linSen_param.exposure);
+				}
 				break;
 			case 'P':
-				set_flag(&linSen_param.pixel_clock);
-				if (optarg) linSen_param.pixel_clock.value = atoi(optarg);
+				if (optarg) {
+					linSen_param.pixel_clock.value = atoi(optarg);
+					set_set(&linSen_param.pixel_clock);
+				} else {
+					set_get(&linSen_param.pixel_clock);
+				}
 				break;
 			case 'F':
-				set_flag(&linSen_param.frame);
+				set_get(&linSen_param.frame);
 				break;
 			case 'R':
-				set_flag(&linSen_param.global_result);
+				set_get(&linSen_param.global_result);
 				break;
 			case 'Q':
-				set_flag(&quad_param.raw);
+				set_get(&quad_param.raw);
 				break;
 			case 'X':
-				set_flag(&quad_param.filtered);
+				set_get(&quad_param.filtered);
 				break;
 			case 'A':
-				set_flag(&quad_param.average);
+				set_get(&quad_param.average);
 				break;
 			case 'v':
-				set_flag(&prog_param.verbose);
+				set_set(&prog_param.verbose);
 				break;
 			case 'k':
 				if (optarg) {
-					set_flag(&prog_param.socket_client);
+					set_set(&prog_param.socket_client);
 					prog_param.socket_client.server_address = optarg;
-				} else set_flag(&prog_param.socket_server);
+				} else {
+					set_set(&prog_param.socket_server);
+				}
 				break;
 			case 'f':
-				set_flag(&prog_param.log);
+				set_set(&prog_param.log);
 				prog_param.log.file = optarg;
 				break;
 			case 'p':
-				set_flag(&servo_param.pos);
-				if (optarg) servo_param.pos.value = atoi(optarg);
+				if (optarg) {
+					servo_param.pos.value = atoi(optarg);
+					set_set(&servo_param.pos);
+				} else {
+					set_get(&servo_param.pos);
+				}
 				break;
 			case 'h':
 				print_usage(argv[0]);
@@ -268,10 +288,10 @@ void sig_handler(int signo) {
 
 	switch (signo) {
 		case SIGINT:
-			clear_flag(&prog_param.socket_client);
-			clear_flag(&prog_param.socket_server);
-			clear_flag(&prog_param.gui);
-			clear_flag(&prog_param.continuous);
+			clear_set(&prog_param.socket_client);
+			clear_set(&prog_param.socket_server);
+			clear_set(&prog_param.gui);
+			clear_set(&prog_param.continuous);
 			
 			/* forced, dirty exit */
 			if (repeatedly++) exit(EXIT_SUCCESS);
@@ -287,10 +307,11 @@ int main(int argc, char *argv[]) {
 
 	printf("\nlinSen connect tool\n\n");
 
-	if (argc < 2) {
-		print_usage(argv[0]);
-		return EXIT_SUCCESS;
-	}
+//	if (argc < 2) {
+//		print_usage(argv[0]);
+//		return EXIT_SUCCESS;
+//	}
+
 
 	/* set up signal handler */
 	if (signal(SIGINT, sig_handler) == SIG_ERR) printf("can't catch SIGINT\n");
@@ -301,8 +322,8 @@ int main(int argc, char *argv[]) {
 	/* check, if not more than one client interface was declared */
 	if (is_set(prog_param.i2c) && is_set(prog_param.socket_client)) {
 		printf("can't use i2c and client socket interface simultaneously! Set socket to server functionality, instead!\n");
-		clear_flag(&prog_param.socket_client);
-		set_flag(&prog_param.socket_server);
+		clear_set(&prog_param.socket_client);
+		set_set(&prog_param.socket_server);
 	}
 
 	/* i2c interface */
@@ -314,7 +335,7 @@ int main(int argc, char *argv[]) {
 		result = linSen_init(prog_param.i2c.dev, prog_param.i2c_addr.value, interface_I2C);
 		if (result < 0) {
 			printf(" ...failed with error %d: %s\n", errno, strerror(errno));
-			clear_flag(&prog_param.i2c);
+			clear_set(&prog_param.i2c);
 		}
 		else printf(" ...finished\n");
 	}
@@ -327,7 +348,7 @@ int main(int argc, char *argv[]) {
 		result = linSen_init(prog_param.socket_client.server_address, 0, interface_SOCKET);
 		if (result == EXIT_FAILURE) {
 			printf(" ...failed with error %d: %s\n", errno, strerror(errno));
-			clear_flag(&prog_param.socket_client);
+			clear_set(&prog_param.socket_client);
 		}
 		else printf(" ...finished\n");
 	}
@@ -349,13 +370,13 @@ int main(int argc, char *argv[]) {
 		result = linSen_init(NULL, 0, interface_SOCKET);
 		if (result < 0) {
 			printf(" ...failed with error %d: %s\n", errno, strerror(errno));
-			clear_flag(&prog_param.socket_server);
+			clear_set(&prog_param.socket_server);
 		}
 		else printf(" ...finished\n");
 	}
 	
 	/* benchmark i2c */
-	if (is_set(prog_param.mark) && (is_set(prog_param.i2c))) {
+	if (is_get(prog_param.mark) && (is_set(prog_param.i2c))) {
 		double t1, t2, t;
 		int result, i;
 		printf("benchmark i2c connection - %d reads each\n", prog_param.mark.value);
@@ -439,21 +460,21 @@ int main(int argc, char *argv[]) {
 		viewer_init(&argc, &argv);
 #else
 		printf("no GUI supported for current host OS configuration\n");
-		clear_flag(&prog_param.gui);
+		clear_set(&prog_param.gui);
 #endif //GTK_GUI
 	}
 	
 	/* prepare header for logging or continuos CLI operation */
 	if (is_set(prog_param.continuous)) {
 		fprintf(lfd, "date\tid");
-		if (is_set(linSen_param.brightness)) fprintf(lfd, "\tbright");
-		if (is_set(linSen_param.pixel_clock)) fprintf(lfd, "\tpxclk");
-		if (is_set(linSen_param.exposure)) fprintf(lfd, "\texp");
-		if (is_set(linSen_param.global_result)) fprintf(lfd, "\tresult");
-		if (is_set(quad_param.average)) fprintf(lfd, "\tq_average");
-		if (is_set(quad_param.raw)) fprintf(lfd, "\tq_raw_0 \tq_raw_1 \tq_raw_2 \tq_raw_3");
-		if (is_set(quad_param.filtered)) fprintf(lfd, "\tq_filt_0 \tq_filt_1 \tq_filt_2 \tq_filt_3");
-		if (is_set(servo_param.pos)) fprintf(lfd, "\tservo0");			
+		if (is_get(linSen_param.brightness)) fprintf(lfd, "\tbright");
+		if (is_get(linSen_param.pixel_clock)) fprintf(lfd, "\tpxclk");
+		if (is_get(linSen_param.exposure)) fprintf(lfd, "\texp");
+		if (is_get(linSen_param.global_result)) fprintf(lfd, "\tresult");
+		if (is_get(quad_param.average)) fprintf(lfd, "\tq_average");
+		if (is_get(quad_param.raw)) fprintf(lfd, "\tq_raw_0 \tq_raw_1 \tq_raw_2 \tq_raw_3");
+		if (is_get(quad_param.filtered)) fprintf(lfd, "\tq_filt_0 \tq_filt_1 \tq_filt_2 \tq_filt_3");
+		if (is_get(servo_param.pos)) fprintf(lfd, "\tservo0");			
 		fprintf(lfd, "\n");
 	}
 
@@ -482,12 +503,12 @@ int main(int argc, char *argv[]) {
 				if (is_set(prog_param.continuous)) {
 					/* contious operation - logging */
 					fprintf(lfd, "%f\t%d\t", getTime(), linSen_data.result_id);
-					if (is_set(linSen_param.brightness)) fprintf(lfd, "\t%d", linSen_data.brightness);
-					if (is_set(linSen_param.pixel_clock)) fprintf(lfd, "\t%d", linSen_data.pixel_clock);
-					if (is_set(linSen_param.exposure)) fprintf(lfd, "\t%d" , linSen_data.exposure);
-					if (is_set(linSen_param.global_result)) fprintf(lfd, "\t%d", linSen_data.global_result);					
-					if (is_set(quad_param.average)) fprintf(lfd, "\t%d", linSen_qp_get_avg());
-					if (is_set(quad_param.raw)) {
+					if (is_get(linSen_param.brightness)) fprintf(lfd, "\t%d", linSen_data.brightness);
+					if (is_get(linSen_param.pixel_clock)) fprintf(lfd, "\t%d", linSen_data.pixel_clock);
+					if (is_get(linSen_param.exposure)) fprintf(lfd, "\t%d" , linSen_data.exposure);
+					if (is_get(linSen_param.global_result)) fprintf(lfd, "\t%d", linSen_data.global_result);					
+					if (is_get(quad_param.average)) fprintf(lfd, "\t%d", linSen_qp_get_avg());
+					if (is_get(quad_param.raw)) {
 						uint32_t frame[4];
 						int i;
 
@@ -498,7 +519,7 @@ int main(int argc, char *argv[]) {
 							}
 						}
 					}
-					if (is_set(quad_param.filtered)) {
+					if (is_get(quad_param.filtered)) {
 						uint32_t frame[4];
 						int i;
 
@@ -509,7 +530,7 @@ int main(int argc, char *argv[]) {
 							}
 						}
 					}
-					if (is_set(servo_param.pos)) fprintf(lfd, "\t%d", linSen_servo_get_pos(0));
+					if (is_get(servo_param.pos)) fprintf(lfd, "\t%d", linSen_servo_get_pos(0));
 					fprintf(lfd, "\n");
 				}
 #ifdef GTK_GUI			
@@ -555,8 +576,8 @@ int main(int argc, char *argv[]) {
 
 				if (time && (time < getTime())) {
 					// stop after defined time - if given
-					clear_flag(&prog_param.continuous);
-					clear_flag(&prog_param.gui);
+					clear_set(&prog_param.continuous);
+					clear_set(&prog_param.gui);
 				}
 			}
 #ifdef GTK_GUI
@@ -572,94 +593,98 @@ int main(int argc, char *argv[]) {
 	if (!is_set(prog_param.gui) && !is_set(prog_param.continuous) && !is_set(prog_param.socket_server)) {	
 		/* intermittent CLI print out presentation */
 		if (is_set(prog_param.i2c) || is_set(prog_param.socket_client)) {
-			if (is_set(prog_param.val_read)) {
-				if (is_set(linSen_param.brightness)) printf("brightness: %d\n", linSen_get_brightness());
-				if (is_set(linSen_param.pixel_clock)) printf("pixel clock: %d kHz\n", linSen_get_pxclk());
-				if (is_set(linSen_param.exposure)) printf("exposure: %d µs\n", linSen_get_exposure());
-				if (is_set(linSen_param.global_result)) printf("global result scalar: %d\n", linSen_get_global_result(NULL));
-				if (is_set(linSen_param.frame)) {
-					linSen_data_t linSen_data;
-					uint16_t* frame;
-					int i,j;
+			/* setter */
+			if (is_set(linSen_param.brightness)) {
+				printf("set brightness set point to %d...", linSen_param.brightness.value);
+				result = linSen_set_brightness(linSen_param.brightness.value);
+				if (result < 0) printf("failed\n");
+				else printf("done\n");
+			}
+			if (is_set(linSen_param.pixel_clock)) {
+				printf("set pixel clock to %d kHz\n", linSen_param.pixel_clock.value);
+				result = linSen_set_pxclk(linSen_param.pixel_clock.value);
+				if (result < 0) printf("failed\n");
+				else printf("done\n");
+			}
+			if (is_set(linSen_param.exposure)) {
+				printf("set exposure to %d µs...", linSen_param.exposure.value);
+				result = linSen_set_exposure(linSen_param.exposure.value);
+				if (result < 0) printf("failed\n");
+				else printf("done\n");
+			}
+			if (is_set(servo_param.pos)) {
+				printf("set servo position to %d ...", servo_param.pos.value);
+				result = linSen_servo_set_pos(0, servo_param.pos.value);
+				if (result < 0) printf("failed\n");
+				else printf("done\n");
+			}
 
-					printf("try to grab a complete set of sensor values:\n");
-					result = linSen_get_data(&linSen_data);
-					if (result < 0) {
-						info_printf("failed getting linSen data: %d\n", result);
-					} else {
-						printf("\tbrightness: %d\n", linSen_data.brightness);
-						printf("\tpixel clock: %d kHz\n", linSen_data.pixel_clock);
-						printf("\texposure: %d µs\n", linSen_data.exposure);
-						printf("\tglobal result id: %d\n", linSen_data.result_id);
-						printf("\tglobal result scalar: %d\n", linSen_data.global_result);
-						printf("\tpixel number: %d x %d\n", linSen_data.pixel_number_x, linSen_data.pixel_number_y);
-						printf("\tlocal scalar number: %d\n", linSen_data.result_scalar_number);
-						frame = malloc(linSen_data.pixel_number_x * linSen_data.pixel_number_y * sizeof(uint16_t));
-						result = linSen_get_raw(frame, linSen_data.pixel_number_x * linSen_data.pixel_number_y);
-						printf("\tgot: %d bytes\n", result);
+			/* getter */
+			if (is_get(linSen_param.brightness)) printf("brightness: %d\n", linSen_get_brightness());
+			if (is_get(linSen_param.pixel_clock)) printf("pixel clock: %d kHz\n", linSen_get_pxclk());
+			if (is_get(linSen_param.exposure)) printf("exposure: %d µs\n", linSen_get_exposure());
+			if (is_get(linSen_param.global_result)) printf("global result scalar: %d\n", linSen_get_global_result(NULL));
+			if (is_get(linSen_param.frame)) {
+				linSen_data_t linSen_data;
+				uint16_t* frame;
+				int i,j;
 
-						int k;
-						if (linSen_data.result_scalar_number) k = linSen_data.result_scalar_number; else k = 8;
+				printf("try to grab a complete set of sensor values:\n");
+				result = linSen_get_data(&linSen_data);
+				if (result < 0) {
+					info_printf("failed getting linSen data: %d\n", result);
+				} else {
+					printf("\tbrightness: %d\n", linSen_data.brightness);
+					printf("\tpixel clock: %d kHz\n", linSen_data.pixel_clock);
+					printf("\texposure: %d µs\n", linSen_data.exposure);
+					printf("\tglobal result id: %d\n", linSen_data.result_id);
+					printf("\tglobal result scalar: %d\n", linSen_data.global_result);
+					printf("\tpixel number: %d x %d\n", linSen_data.pixel_number_x, linSen_data.pixel_number_y);
+					printf("\tlocal scalar number: %d\n", linSen_data.result_scalar_number);
+					frame = malloc(linSen_data.pixel_number_x * linSen_data.pixel_number_y * sizeof(uint16_t));
+					result = linSen_get_raw(frame, linSen_data.pixel_number_x * linSen_data.pixel_number_y);
+					printf("\tgot: %d bytes\n", result);
 
+					int k;
+					if (linSen_data.result_scalar_number) k = linSen_data.result_scalar_number; else k = 8;
 						if (result > 0) {
-							for (i=0;i<linSen_data.pixel_number_y;i++) {
-								for (j=0;j<linSen_data.pixel_number_x;j++) {
-									if (!(j%k)) printf("\n");
-									printf("\t%d", frame[i * linSen_data.pixel_number_x + j]);
-								}
+						for (i=0;i<linSen_data.pixel_number_y;i++) {
+							for (j=0;j<linSen_data.pixel_number_x;j++) {
+								if (!(j%k)) printf("\n");
+								printf("\t%d", frame[i * linSen_data.pixel_number_x + j]);
 							}
 						}
-						printf("\n");
 					}
-				}
-				if (is_set(quad_param.average)) printf("quadPix sensor average: %d\n", linSen_qp_get_avg());
-				if (is_set(quad_param.raw)) {
-					uint32_t frame[4];
-					int i;
-
-					printf("quadPix sensor values: \n");
-					result = linSen_qp_get_raw(frame, 4);
-					if (result > 0) {
-						for (i=0;i<4;i++) {
-							printf("\t%d", frame[i]);
-						}
-					} else printf("failed");
 					printf("\n");
 				}
-				if (is_set(quad_param.filtered)) {
-					uint32_t frame[4];
-					int i;
+			}
+			if (is_get(quad_param.average)) printf("quadPix sensor average: %d\n", linSen_qp_get_avg());
+			if (is_get(quad_param.raw)) {
+				uint32_t frame[4];
+				int i;
+				printf("quadPix sensor values: \n");
+				result = linSen_qp_get_raw(frame, 4);
+				if (result > 0) {
+					for (i=0;i<4;i++) {
+						printf("\t%d", frame[i]);
+					}
+				} else printf("failed");
+				printf("\n");
+			}
+			if (is_get(quad_param.filtered)) {
+				uint32_t frame[4];
+				int i;
 
-					printf("quadPix filtered sensor values: \n");
-					result = linSen_qp_get_filt(frame, 4);
-					if (result > 0) {
-						for (i=0;i<4;i++) {
-							printf("\t%d", frame[i]);
-						}
-					} else printf("failed");
-					printf("\n");
-				}
-				if (is_set(servo_param.pos)) fprintf(lfd, "servo pos: %d\n", linSen_servo_get_pos(0));
-					
+				printf("quadPix filtered sensor values: \n");
+				result = linSen_qp_get_filt(frame, 4);
+				if (result > 0) {
+					for (i=0;i<4;i++) {
+						printf("\t%d", frame[i]);
+					}
+				} else printf("failed");
+				printf("\n");
 			}
-			if (is_set(prog_param.val_write)) {
-				if (is_set(linSen_param.brightness)) {
-					printf("set brightness set point to %d...", linSen_param.brightness.value);
-					result = linSen_set_brightness(linSen_param.brightness.value);
-					if (result < 0) printf("failed\n");
-					else printf("done\n");
-				}
-				if (is_set(linSen_param.pixel_clock)) {
-					printf("set pixel clock to %d kHz\n", linSen_param.pixel_clock.value);
-					linSen_set_pxclk(linSen_param.pixel_clock.value);
-				}
-				if (is_set(linSen_param.exposure)) {
-					printf("set exposure to %d µs...", linSen_param.exposure.value);
-					result = linSen_set_exposure(linSen_param.exposure.value);
-					if (result < 0) printf("failed\n");
-					else printf("done\n");
-				}
-			}
+			if (is_get(servo_param.pos)) fprintf(lfd, "servo pos: %d\n", linSen_servo_get_pos(0));
 		}
 	}
 
