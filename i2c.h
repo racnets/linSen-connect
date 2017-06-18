@@ -1,7 +1,9 @@
 /*
  * i2c.h
  *
- * Author: carsten
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets 
  */
 
 #ifndef I2C_H_

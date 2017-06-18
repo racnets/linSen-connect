@@ -1,5 +1,9 @@
 /*
  * gtk-viewer.h
+ * 
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets 
  */
 
 #ifndef GTK_VIEWER_H

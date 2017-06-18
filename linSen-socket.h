@@ -1,5 +1,9 @@
 /*
  * linSen-socket.h
+ *
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets 
  */
 
 #ifndef LINSEN_SOCKET_H_

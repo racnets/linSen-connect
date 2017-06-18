@@ -1,7 +1,9 @@
 /*
  * linSen.h
  *
- * Author: carsten
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets 
  */
 
 #ifndef LINSEN_H_
@@ -94,6 +96,14 @@ int linSen_process();
 int linSen_qp_get_raw(uint32_t* frame, int size);
 int linSen_qp_get_avg(void);
 int linSen_qp_get_filt(uint32_t* frame, int size);
+
+/* servo addon */
+#define LINSEN_SERVO_NUMBER				1
+#define LINSEN_SERVO_0_POS_ADDR			0x38
+
+#define LINSEN_SERVO_0_POS_READ_STRING	"rS0P"
+
+int linSen_servo_get_pos(int chan);
 
 
 #endif /* LINSEN_H_ */

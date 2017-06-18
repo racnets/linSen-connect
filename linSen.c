@@ -1,9 +1,10 @@
 /*
  * linSen.c
  *
- * Author: retsnac
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets
  */
-
 #include <stdint.h>	// XintY_t-types
 #include <stdlib.h>	// NULL
 #include <stdio.h>	//fprintf, printf
@@ -372,7 +373,7 @@ int linSen_get_data(linSen_data_t* data){
 			data->pixel_number_y = buffer[5];
 			data->result_scalar_number = (buffer[6] & 0x00FF);
 			data->result_id = buffer[7];
-			data->global_result = (int8_t)buffer[8];
+			data->global_result = (int16_t)buffer[8];
 			
 			break;
 		}
@@ -501,6 +502,37 @@ int linSen_qp_get_filt(uint32_t *frame, int size){
 		default:;
 	}
 
+	debug_printf("returns: %d", result);		
+	return result;
+}
+
+/*
+ * linSen servo get position value
+ * 
+ * @param chan: servo channel
+ * @return non-negative position(success), -1 (failure)
+ */
+int linSen_servo_get_pos(int chan){
+	int result = -1;
+	debug_printf("called");
+	
+	if (chan < 0) return result;
+	if (chan >= LINSEN_SERVO_NUMBER) return result;
+	
+	switch (linSen_access_interface) {
+		case interface_I2C: {
+			int16_t _value;
+			if (i2c_read_w(LINSEN_SERVO_0_POS_ADDR, (uint16_t*)&_value) == 2) result = _value;
+			break;
+		}
+		case interface_SOCKET: {
+			int _value;
+			if (linSen_socket_read(LINSEN_SERVO_0_POS_READ_STRING, &_value, sizeof(uint16_t)) == EXIT_SUCCESS) result = _value;
+			break;
+		}
+		default:;
+	}
+	
 	debug_printf("returns: %d", result);		
 	return result;
 }

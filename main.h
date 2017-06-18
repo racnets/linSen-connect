@@ -1,7 +1,9 @@
 /*
  * main.h
  *
- * Author: racnets
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets 
  */
 
 #ifndef MAIN_H_

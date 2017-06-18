@@ -1,12 +1,19 @@
-#include <errno.h>		//errno
-#include <signal.h>		//catch SIGTERM
+/*
+ * main.c
+ *
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets
+ */
+#include <errno.h>     //errno
+#include <signal.h>    //catch SIGTERM
 #include <stdint.h>
-#include <unistd.h>		//close, sleep
-#include <stdio.h>		//fprintf, printf
-#include <stdlib.h>		//atoi, atof, strtol
-#include <string.h>		//strcmp, strerror
-#include <getopt.h>		//getoptlong
-#include <sys/time.h>	//gettimeofday
+#include <unistd.h>    //close, sleep
+#include <stdio.h>     //fprintf, printf
+#include <stdlib.h>    //atoi, atof, strtol
+#include <string.h>    //strcmp, strerror
+#include <getopt.h>    //getoptlong
+#include <sys/time.h>  //gettimeofday
 
 #include "main.h"
 
@@ -46,6 +53,10 @@ struct {
 	param_type average;
 	param_type filtered;
 } quad_param;
+
+struct {
+	param_type pos;
+} servo_param;
 
 struct {
 	param_type continuous;
@@ -113,15 +124,17 @@ static void print_usage(const char *prog)
 	     "  -w      --write          writes value(s)\n"
 	     "  -m      --mark           i2c benchmark\n"
 	     " linSen related\n"
-	     "  -E[arg] --exp[=arg]      exposure\n"
-	     "  -P[arg] --pxclk[=arg]    pixel clock\n"
-	     "  -B[arg] --bright[=arg]   brightness\n"
-	     "  -F      --frame          frame\n"
-	     "  -R      --result         global result scalar\n"
+	     "  -E[arg] --exp[=arg]      get or set exposure\n"
+	     "  -P[arg] --pxclk[=arg]    get or set pixel clock\n"
+	     "  -B[arg] --bright[=arg]   get or set brightness\n"
+	     "  -F      --frame          get frame\n"
+	     "  -R      --result         get global result scalar\n"
 	     " quadPix related\n"
-	     "  -Q      --quad           quadPix raw values\n"
-	     "  -A      --qavg           average quadPix value\n"
-	     "  -X      --qfilt          quadPix filtered values\n"
+	     "  -Q      --quad           get quadPix raw values\n"
+	     "  -A      --qavg           get average quadPix value\n"
+	     "  -X      --qfilt          get quadPix filtered values\n"
+	     " servo related\n"
+	     "  -p[arg] --pos[=arg]      get or set servo position\n"
 	);
 	exit(1);
 }
@@ -154,6 +167,7 @@ static void parse_opts(int argc, char *argv[])
 			{ "quad",    no_argument,       0, 'Q' },
 			{ "qavg",    no_argument,       0, 'A' },
 			{ "qfilt",   no_argument,       0, 'X' },
+			{ "pos",     optional_argument, 0, 'p' },
 			{ NULL, 0, 0, 0 },
 		};
 		int c;
@@ -163,7 +177,7 @@ static void parse_opts(int argc, char *argv[])
 		 * ::	optional argument
 		 * 		no_argument
 		*/
-		c = getopt_long(argc, argv, "a:c::f:i::k::B::E::m::P::AFghQrvwRX", lopts, NULL);
+		c = getopt_long(argc, argv, "a:c::f:i::k::B::E::m::p::P::AFghQrvwRX", lopts, NULL);
 
 		if (c == -1)
 			break;
@@ -233,6 +247,10 @@ static void parse_opts(int argc, char *argv[])
 			case 'f':
 				set_flag(&prog_param.log);
 				prog_param.log.file = optarg;
+				break;
+			case 'p':
+				set_flag(&servo_param.pos);
+				if (optarg) servo_param.pos.value = atoi(optarg);
 				break;
 			case 'h':
 				print_usage(argv[0]);
@@ -314,7 +332,7 @@ int main(int argc, char *argv[]) {
 		else printf(" ...finished\n");
 	}
 		
-	// check, if at least one interface was declared
+	/* check, if at least one interface was declared */
 	if (!is_set(prog_param.i2c) && !is_set(prog_param.socket_client)) {
 		printf("no valid linSen-interface defined!\n");
 		if (!is_set(prog_param.gui)) {
@@ -433,8 +451,9 @@ int main(int argc, char *argv[]) {
 		if (is_set(linSen_param.exposure)) fprintf(lfd, "\texp");
 		if (is_set(linSen_param.global_result)) fprintf(lfd, "\tresult");
 		if (is_set(quad_param.average)) fprintf(lfd, "\tq_average");
-		if (is_set(quad_param.filtered)) fprintf(lfd, "\tq_filt_0 \tq_filt_1 \tq_filt_2 \tq_filt_3");
 		if (is_set(quad_param.raw)) fprintf(lfd, "\tq_raw_0 \tq_raw_1 \tq_raw_2 \tq_raw_3");
+		if (is_set(quad_param.filtered)) fprintf(lfd, "\tq_filt_0 \tq_filt_1 \tq_filt_2 \tq_filt_3");
+		if (is_set(servo_param.pos)) fprintf(lfd, "\tservo0");			
 		fprintf(lfd, "\n");
 	}
 
@@ -467,6 +486,7 @@ int main(int argc, char *argv[]) {
 					if (is_set(linSen_param.pixel_clock)) fprintf(lfd, "\t%d", linSen_data.pixel_clock);
 					if (is_set(linSen_param.exposure)) fprintf(lfd, "\t%d" , linSen_data.exposure);
 					if (is_set(linSen_param.global_result)) fprintf(lfd, "\t%d", linSen_data.global_result);					
+					if (is_set(quad_param.average)) fprintf(lfd, "\t%d", linSen_qp_get_avg());
 					if (is_set(quad_param.raw)) {
 						uint32_t frame[4];
 						int i;
@@ -489,7 +509,7 @@ int main(int argc, char *argv[]) {
 							}
 						}
 					}
-					if (is_set(quad_param.average)) fprintf(lfd, "\t%d", linSen_qp_get_avg());
+					if (is_set(servo_param.pos)) fprintf(lfd, "\t%d", linSen_servo_get_pos(0));
 					fprintf(lfd, "\n");
 				}
 #ifdef GTK_GUI			
@@ -619,6 +639,7 @@ int main(int argc, char *argv[]) {
 					} else printf("failed");
 					printf("\n");
 				}
+				if (is_set(servo_param.pos)) fprintf(lfd, "servo pos: %d\n", linSen_servo_get_pos(0));
 					
 			}
 			if (is_set(prog_param.val_write)) {

@@ -1,13 +1,21 @@
+/*
+ * gtk-viewer.c
+ *
+ * Created on: 22.01.2014
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets
+ */
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>	// XintY_t
+#include <stdint.h>  //XintY_t
 #include <string.h>
 #include <unistd.h>
 
 #include <gtk/gtk.h>
 #include <cairo.h>
 
-#include "main.h"  //verbose(), verpose_printf()
+#include "main.h"  //verbose, verpose_printf
 
 #include "linSen.h"
 #include "gtk-viewer.h"

@@ -2,6 +2,8 @@
  * i2c.c
  *
  * Author: racnets
+ * Last modified: 18.06.2017
+ *
  * raspi does not support clock-streching correctly:
  * http://elinux.org/BCM2835_datasheet_errata#p35_I2C_clock_stretching
  * so sometimes the ACK gets interpreted as MSB :-|

@@ -1,15 +1,22 @@
-#include <errno.h>		// errno
-#include <sys/types.h>	// legacy support - may be needed for socket.h
-#include <sys/socket.h>	// accept, connect, recv, send, socket
-#include <netinet/in.h>	// sockaddr_in
-#include <arpa/inet.h>	// htons(), inet_aton()
-#include <limits.h>		// INT_MAX
+/*
+ * linSen-socket.c
+ * 
+ * Last modified: 18.06.2017
+ *
+ * Author: racnets
+ */
+#include <errno.h>       // errno
+#include <sys/types.h>   // legacy support - may be needed for socket.h
+#include <sys/socket.h>  //accept, connect, recv, send, socket
+#include <netinet/in.h>  //sockaddr_in
+#include <arpa/inet.h>   //htons(), inet_aton()
+#include <limits.h>      //INT_MAX
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "main.h"		// verbose(), verpose_printf()
+#include "main.h"	 //verbose(), verpose_printf()
 
 #include "linSen.h"
 #include "linSen-socket.h"
@@ -43,6 +50,7 @@ typedef enum {
 	STATE_TX_QP_GRAB, 
 	STATE_TX_QP_FILT, 
 	STATE_TX_QP_AVG, 
+	STATE_TX_SERVO_0_POS,
 	STATE_TX, 
 	STATE_TX_UNKNOWN, 
 	STATE_EXIT
@@ -67,6 +75,7 @@ const parse_id_state_pair_t parse_id_state_pair[] = {
 	{LINSEN_QP_RAW_READ_STRING,		STATE_TX_QP_GRAB},
 	{LINSEN_QP_AVG_READ_STRING,		STATE_TX_QP_AVG},
 	{LINSEN_QP_FIL_READ_STRING,		STATE_TX_QP_FILT},
+	{LINSEN_SERVO_0_POS_READ_STRING,STATE_TX_SERVO_0_POS},
 	{"quit",						STATE_EXIT},
 	{"exit",						STATE_EXIT}
 };
@@ -544,6 +553,23 @@ int linSen_socket_server_process(void) {
 			/* build string */
 			_tx_buffer = malloc(strlen(LINSEN_QP_AVG_READ_STRING) + strlen(DEFTOSTRING(INT_MAX)) + 1);
 			sprintf(_tx_buffer, "%s%d", LINSEN_QP_AVG_READ_STRING, result);
+			/* get real string length */
+			_tx_buffer_size = strlen(_tx_buffer);
+			
+			state = STATE_TX;
+			break;
+		}
+		case STATE_TX_SERVO_0_POS: {
+			/* get servo 0 position data */
+			result = linSen_servo_get_pos(0);
+			if (result < 0) {
+				verbose_printf("\tget linSen servo %d position failed with error %d: %s\n", 0, errno, strerror(errno));
+				return EXIT_FAILURE;
+			}
+			
+			/* build string */
+			_tx_buffer = malloc(strlen(LINSEN_SERVO_0_POS_READ_STRING) + strlen(DEFTOSTRING(INT_MAX)) + 1);
+			sprintf(_tx_buffer, "%s%d", LINSEN_SERVO_0_POS_READ_STRING, result);
 			/* get real string length */
 			_tx_buffer_size = strlen(_tx_buffer);
 			

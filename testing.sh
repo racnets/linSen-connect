@@ -2,6 +2,10 @@
 
 echo "linSen data collection" 
 
+# buld log-file name
+log=${0##*/}
+log=${log%.*}.log
+
 sensor_prog="./linSen-connect -i/dev/i2c-1"
 servo_prog="./linSen-connect -i/dev/i2c-1 -a 0x20" 
 i2c_dev=1
@@ -29,10 +33,14 @@ fi
 speeds=(0x04)
 
 # set servo min value
-$(i2cset -y $i2c_dev $servo_i2c_addr $servo_max_addr 1700 w)
+#i2cset -y $i2c_dev $servo_i2c_addr $servo_min_addr 1700 w
+servo_min=$(($(i2cget -y $i2c_dev $servo_i2c_addr $servo_min_addr w)))
+echo "servo_min: $servo_min"
 
 # set servo max value
-$(i2cset -y $i2c_dev $servo_i2c_addr $servo_max_addr 7700 w)
+#i2cset -y $i2c_dev $servo_i2c_addr $servo_max_addr 7700 w
+servo_max=$(($(i2cget -y $i2c_dev $servo_i2c_addr $servo_max_addr w)))
+echo "servo_max: $servo_max"
 
 for run in {1}
 #for run in {1..10}
@@ -45,27 +53,36 @@ do
 		t=10
 
 		# set linSen brightness set-point to 2000
-		$sensor_prog -w -B2000
+		$sensor_prog -w -B2000 >> $log
+
+		# set servo to initial position and speed
+		i2cset -y $i2c_dev $servo_i2c_addr $servo_pos_addr $servo_min w
+		i2cset -y $i2c_dev $servo_i2c_addr $servo_speed_addr 1000 w
 		sleep 1
-
-		#set servo initial position and speed
-		$(i2cset -y $i2c_dev $servo_i2c_addr $servo_pos_addr 0x00 w)
-		$(i2cset -y $i2c_dev $servo_i2c_addr $servo_speed_addr $s w)
-
+		
+		# prepare for logging
 		d=$(date +%H%M%S)
 		id="speed$s""_$d"
 
-		program1=$sensor_prog" -c$t -f $path/$id.dat -r -E -P -B -R -Q -A -X &"
-		program2=$servo_prog" -c$t -f $path/$id""_bright.dat -r -Q -A &"
+		program1=$sensor_prog" -c$t -f $path/$id.dat -r -E -P -B -R -Q -A -X &" >> log
+		program2=$servo_prog" -c$t -f $path/$id""_bright.dat -r -Q -A -p &" >> log
 
-		echo "$program1"
-		echo "$program2"
+#		echo "$program1"
+#		echo "$program2"
+		
+		# read result in order to empty output buffer
+		$sensor_prog -r -R >> $log
+		
+		# set servo target position and speed
+		i2cset -y $i2c_dev $servo_i2c_addr $servo_speed_addr $s w
+		i2cset -y $i2c_dev $servo_i2c_addr $servo_pos_addr $servo_max w
+		
+		eval $program2 
 		eval $program1
-		eval $program2
 		wait
 	done
 done
 
 # stop servo
-$(i2cset -y $i2c_dev $servo_i2c_addr $servo_speed_addr 0x00 w)
+i2cset -y $i2c_dev $servo_i2c_addr $servo_speed_addr 0x00 w
 
